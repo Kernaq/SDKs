@@ -1,0 +1,25 @@
+# Node
+node_modules/
+dist/
+*.env
+!*.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Java / Maven
+target/
+*.class
+*.jar
+
+# Go
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
