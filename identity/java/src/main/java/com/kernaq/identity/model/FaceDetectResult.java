@@ -14,6 +14,7 @@ public class FaceDetectResult {
     @JsonProperty("age_range_high")  public int                ageRangeHigh;
     @JsonProperty("gender")          public String             gender;
     @JsonProperty("attributes")      public Map<String,Object> attributes;
+    @JsonProperty("processed_at")    public String             processedAt;
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class BoundingBox {

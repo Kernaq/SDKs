@@ -37,6 +37,12 @@ export interface QualityConfig {
 export interface CaptureSession {
   /** Opaque session token — attached as X-Capture-Token on submission */
   token: string
+  /**
+   * Single-use anti-replay nonce — attached as X-Capture-Nonce on submission.
+   * The backend verifies this matches the nonce issued with the session,
+   * preventing a captured token from being replayed by an attacker.
+   */
+  nonce: string
   expiresAt: Date
 }
 
@@ -65,24 +71,70 @@ export type QualityFailure =
 export interface SubmitVerificationOptions {
   /** Session token from CaptureSession.token */
   sessionToken: string
+  /**
+   * Anti-replay nonce from CaptureSession.nonce.
+   * Must be included — the backend rejects submissions without a matching nonce.
+   */
+  nonce: string
+
   document: Blob
   documentName?: string
   selfie: Blob
   selfieName?: string
-  video: Blob
+
+  // ── Liveness — supply video OR all three frames ──────────────────────────
+  /** Standard liveness video (MP4, MOV, WebM). */
+  video?: Blob
   videoName?: string
+  /**
+   * Low-bandwidth alternative to video — 3 JPEG frames for 2G/3G devices.
+   * Supply frame1 (front-facing) + frame2 (head left) + frame3 (head right).
+   * All three must be supplied together.
+   */
+  frame1?: Blob
+  frame1Name?: string
+  frame2?: Blob
+  frame2Name?: string
+  frame3?: Blob
+  frame3Name?: string
+
   documentType: DocumentType
   country: string          // ISO 3166-1 alpha-3 e.g. 'KEN'
   reference: string
   externalUserId?: string
+
+  // ── DPA 2019 consent metadata (optional) ─────────────────────────────────
+  consentReference?: string
+  consentAt?:        string  // ISO 8601 datetime
+  consentType?:      string  // e.g. "explicit"
 }
 
 export type DocumentType =
+  // Core identity
   | 'national_id'
   | 'passport'
   | 'driver_license'
   | 'residence_permit'
   | 'business_registration'
+  // East Africa
+  | 'alien_card'
+  | 'kra_pin_certificate'
+  | 'sha_card'
+  | 'nhif_card'            // alias — normalised to sha_card by server
+  | 'voter_id'
+  | 'refugee_id'
+  | 'foreign_national_id'
+  | 'military_id'
+  | 'student_id'
+  // AML / proof of address
+  | 'utility_bill'
+  | 'bank_statement'
+  | 'proof_of_address'
+  | 'tax_document'
+  | 'employment_letter'
+  | 'vehicle_registration'
+  | 'tenancy_agreement'
+  | 'other'
 
 export interface SubmitVerificationResponse {
   verificationId: string

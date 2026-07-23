@@ -1,16 +1,13 @@
 /**
  * Base HTTP client for the Kernaq Identity API.
- * Handles auth, timeouts, error parsing, and multipart uploads.
+ * Uses native fetch and FormData — requires Node.js 18+ or any modern browser.
+ * No external HTTP dependencies.
  */
-import fetch, { type RequestInit, type Response } from 'node-fetch'
-import FormData from 'form-data'
-import { Readable } from 'stream'
-import { KernaqError, type KernaqErrorBody } from './types.js'
 
 export const DEFAULT_BASE_URL = process.env['KERNAQ_API_URL'] ?? 'https://api.kernaq.com/v1'
 export const DEFAULT_TIMEOUT  = 120_000
 
-export type FileInput = Buffer | NodeJS.ReadableStream | Blob
+export type FileInput = Buffer | ReadableStream | Blob | ArrayBuffer
 
 export class BaseClient {
   protected readonly apiKey:  string
@@ -30,24 +27,18 @@ export class BaseClient {
     path: string,
     body?: unknown,
   ): Promise<T> {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeout)
+    const signal = AbortSignal.timeout(this.timeout)
 
-    let res: Response
-    try {
-      res = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers: {
-          'X-API-Key':    this.apiKey,
-          'Content-Type': 'application/json',
-          'Accept':       'application/json',
-        },
-        body:   body ? JSON.stringify(body) : undefined,
-        signal: controller.signal as never,
-      } satisfies RequestInit)
-    } finally {
-      clearTimeout(timer)
-    }
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        'X-API-Key':    this.apiKey,
+        'Content-Type': 'application/json',
+        'Accept':       'application/json',
+      },
+      body:   body != null ? JSON.stringify(body) : undefined,
+      signal,
+    })
 
     return this.parseResponse<T>(res)
   }
@@ -66,35 +57,38 @@ export class BaseClient {
     }
 
     for (const { field, value, filename, contentType } of files) {
-      if (Buffer.isBuffer(value)) {
-        form.append(field, value, { filename, contentType })
-      } else if (value instanceof Blob) {
-        const buf = Buffer.from(await value.arrayBuffer())
-        form.append(field, buf, { filename, contentType })
+      let blob: Blob
+      if (value instanceof Blob) {
+        blob = value
+      } else if (value instanceof ArrayBuffer) {
+        blob = new Blob([value], { type: contentType })
+      } else if (Buffer.isBuffer(value)) {
+        blob = new Blob([value], { type: contentType })
       } else {
-        // ReadableStream
-        form.append(field, value as Readable, { filename, contentType })
+        // ReadableStream — collect chunks
+        const chunks: Uint8Array[] = []
+        const reader = (value as ReadableStream<Uint8Array>).getReader()
+        while (true) {
+          const { done, value: chunk } = await reader.read()
+          if (done) break
+          chunks.push(chunk)
+        }
+        blob = new Blob(chunks, { type: contentType })
       }
+      form.append(field, new File([blob], filename, { type: contentType }))
     }
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeout)
-
-    let res: Response
-    try {
-      res = await fetch(`${this.baseUrl}${path}`, {
-        method:  'POST',
-        headers: {
-          'X-API-Key': this.apiKey,
-          'Accept':    'application/json',
-          ...form.getHeaders(),
-        },
-        body:   form,
-        signal: controller.signal as never,
-      } satisfies RequestInit)
-    } finally {
-      clearTimeout(timer)
-    }
+    const signal = AbortSignal.timeout(this.timeout)
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method:  'POST',
+      headers: {
+        'X-API-Key': this.apiKey,
+        'Accept':    'application/json',
+        // Do NOT set Content-Type — browser/Node sets it with boundary automatically
+      },
+      body:   form,
+      signal,
+    })
 
     return this.parseResponse<T>(res)
   }
@@ -112,7 +106,8 @@ export class BaseClient {
     }
 
     if (!res.ok) {
-      const err = body as KernaqErrorBody
+      const { KernaqError } = await import('./types.js')
+      const err = body as { code?: string; message?: string }
       throw new KernaqError(
         {
           code:    err?.code    ?? 'UNKNOWN_ERROR',

@@ -2,14 +2,22 @@ package com.kernaq.identity.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.Map;
 
-/** Full verification pipeline result from GET /verifications/:id */
+/** Full pipeline result from GET /verifications/:id */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VerificationResult {
 
-    @JsonProperty("verification_id") public String       verificationId;
-    @JsonProperty("status")          public String       status;
-    @JsonProperty("confidence")      public double       confidence;
+    @JsonProperty("verification_id") public String verificationId;
+    @JsonProperty("status")          public String status;
+    /**
+     * Set when status == "failed". Values:
+     * pipeline_timeout | pipeline_error | face_mismatch | liveness_failed |
+     * document_invalid | high_risk | fraud_detected
+     */
+    @JsonProperty("failure_reason")  public String failureReason;
+    @JsonProperty("confidence")      public double confidence;
     @JsonProperty("document")        public DocumentResult  document;
     @JsonProperty("face")            public FaceResult      face;
     @JsonProperty("liveness")        public LivenessResult  liveness;
@@ -17,19 +25,20 @@ public class VerificationResult {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DocumentResult {
-        @JsonProperty("valid")          public boolean        valid;
-        @JsonProperty("type")           public String         type;
+        @JsonProperty("valid")          public boolean       valid;
+        @JsonProperty("type")           public String        type;
         @JsonProperty("extracted_data") public ExtractedFields extractedData;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ExtractedFields {
-        @JsonProperty("first_name")       public String firstName;
-        @JsonProperty("last_name")        public String lastName;
-        @JsonProperty("document_number")  public String documentNumber;
-        @JsonProperty("date_of_birth")    public String dateOfBirth;
-        @JsonProperty("expiry_date")      public String expiryDate;
-        @JsonProperty("country")          public String country;
+        @JsonProperty("first_name")      public String firstName;
+        @JsonProperty("last_name")       public String lastName;
+        @JsonProperty("document_number") public String documentNumber;
+        @JsonProperty("date_of_birth")   public String dateOfBirth;
+        @JsonProperty("expiry_date")     public String expiryDate;
+        @JsonProperty("country")         public String country;
+        @JsonProperty("raw_fields")      public Map<String, Object> rawFields;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -45,6 +54,6 @@ public class VerificationResult {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RiskResult {
-        @JsonProperty("level") public String level;
+        @JsonProperty("level") public String level; // "low" | "medium" | "high" | "unknown"
     }
 }

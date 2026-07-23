@@ -1,7 +1,11 @@
 /**
  * Submits a verification to Kernaq Identity API with the capture session token
- * attached as X-Capture-Token. This is what proves the payload came from a
- * real device running the Kernaq SDK, not a virtual camera or script.
+ * attached as X-Capture-Token + X-Capture-Nonce. This proves the payload came
+ * from a real device running the Kernaq SDK — blocking virtual cameras and scripts.
+ *
+ * Supports two liveness modes:
+ *  - Standard: supply `video`
+ *  - Low-bandwidth (2G/3G): supply `frame1` + `frame2` + `frame3`
  */
 import type {
   SubmitVerificationOptions,
@@ -20,12 +24,22 @@ export async function submitVerification(
   const form = new FormData()
   form.append('document',      opts.document,  opts.documentName ?? 'document.jpg')
   form.append('selfie',        opts.selfie,    opts.selfieName   ?? 'selfie.jpg')
-  form.append('video',         opts.video,     opts.videoName    ?? 'liveness.webm')
   form.append('document_type', opts.documentType)
   form.append('country',       opts.country)
   form.append('reference',     opts.reference)
-  if (opts.externalUserId) {
-    form.append('external_user_id', opts.externalUserId)
+
+  if (opts.externalUserId)   form.append('external_user_id',  opts.externalUserId)
+  if (opts.consentReference) form.append('consent_reference', opts.consentReference)
+  if (opts.consentAt)        form.append('consent_at',        opts.consentAt)
+  if (opts.consentType)      form.append('consent_type',      opts.consentType)
+
+  // Liveness: video OR frame sequence
+  if (opts.video) {
+    form.append('video', opts.video, opts.videoName ?? 'liveness.webm')
+  } else if (opts.frame1 && opts.frame2 && opts.frame3) {
+    form.append('frame_1', opts.frame1, opts.frame1Name ?? 'frame_1.jpg')
+    form.append('frame_2', opts.frame2, opts.frame2Name ?? 'frame_2.jpg')
+    form.append('frame_3', opts.frame3, opts.frame3Name ?? 'frame_3.jpg')
   }
 
   let res: Response
@@ -33,9 +47,11 @@ export async function submitVerification(
     res = await fetch(`${base}/verifications`, {
       method:  'POST',
       headers: {
-        // X-Capture-Token: the cryptographic proof of origin.
-        // The backend validates its SHA-256 hash against capture_sessions.
+        // X-Capture-Token: proves the upload came from the SDK, not a script.
         'X-Capture-Token': opts.sessionToken,
+        // X-Capture-Nonce: single-use anti-replay value paired with the token.
+        'X-Capture-Nonce': opts.nonce,
+        // Do NOT set Content-Type — browser sets it with boundary automatically.
       },
       body: form,
     })

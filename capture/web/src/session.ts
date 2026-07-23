@@ -29,13 +29,17 @@ export async function fetchSession(
     throw makeError('SESSION_FETCH_FAILED', `Session endpoint returned ${res.status}: ${body}`)
   }
 
-  const data = await res.json() as { token?: string; expires_at?: string }
+  const data = await res.json() as { token?: string; nonce?: string; expires_at?: string }
   if (!data.token) {
     throw makeError('SESSION_FETCH_FAILED', 'Session endpoint did not return a token')
+  }
+  if (!data.nonce) {
+    throw makeError('SESSION_FETCH_FAILED', 'Session endpoint did not return a nonce')
   }
 
   return {
     token:     data.token,
+    nonce:     data.nonce,
     expiresAt: data.expires_at ? new Date(data.expires_at) : new Date(Date.now() + 14 * 60 * 1000),
   }
 }

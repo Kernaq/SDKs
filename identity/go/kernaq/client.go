@@ -59,7 +59,7 @@ func newClient(cfg Config) *client {
 
 // ── JSON request ──────────────────────────────────────────────────────────────
 
-func (c *client) do(ctx context.Context, method, path string, body io.Reader, contentType string, out interface{}) error {
+func (c *client) do(ctx context.Context, method, path string, body io.Reader, contentType string, extra map[string]string, out interface{}) error {
 	url := c.baseURL + path
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
@@ -71,6 +71,9 @@ func (c *client) do(ctx context.Context, method, path string, body io.Reader, co
 	req.Header.Set("Accept", "application/json")
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	for k, v := range extra {
+		req.Header.Set(k, v)
 	}
 
 	resp, err := c.http.Do(req)
@@ -102,7 +105,34 @@ func (c *client) do(ctx context.Context, method, path string, body io.Reader, co
 }
 
 func (c *client) get(ctx context.Context, path string, out interface{}) error {
-	return c.do(ctx, http.MethodGet, path, nil, "", out)
+	return c.do(ctx, http.MethodGet, path, nil, "", nil, out)
+}
+
+// postJSON marshals body as JSON and sends a POST request.
+func (c *client) postJSON(ctx context.Context, path string, body interface{}, out interface{}) error {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("kernaq: marshal request: %w", err)
+	}
+	return c.do(ctx, http.MethodPost, path, bytes.NewReader(b), "application/json", nil, out)
+}
+
+// putJSON marshals body as JSON and sends a PUT request.
+func (c *client) putJSON(ctx context.Context, path string, body interface{}, out interface{}) error {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("kernaq: marshal request: %w", err)
+	}
+	return c.do(ctx, http.MethodPut, path, bytes.NewReader(b), "application/json", nil, out)
+}
+
+// patchJSON marshals body as JSON and sends a PATCH request.
+func (c *client) patchJSON(ctx context.Context, path string, body interface{}, out interface{}) error {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("kernaq: marshal request: %w", err)
+	}
+	return c.do(ctx, http.MethodPatch, path, bytes.NewReader(b), "application/json", nil, out)
 }
 
 // ── Multipart upload ──────────────────────────────────────────────────────────
@@ -115,6 +145,12 @@ type filePart struct {
 }
 
 func (c *client) upload(ctx context.Context, path string, fields map[string]string, files []filePart, out interface{}) error {
+	return c.uploadWithHeaders(ctx, path, fields, files, nil, out)
+}
+
+// uploadWithHeaders builds a multipart POST with optional extra HTTP headers.
+// Used by Verifications.Submit to inject X-Capture-Token / X-Capture-Nonce.
+func (c *client) uploadWithHeaders(ctx context.Context, path string, fields map[string]string, files []filePart, extra map[string]string, out interface{}) error {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 
@@ -144,7 +180,7 @@ func (c *client) upload(ctx context.Context, path string, fields map[string]stri
 		return fmt.Errorf("kernaq: close multipart: %w", err)
 	}
 
-	return c.do(ctx, http.MethodPost, path, &buf, mw.FormDataContentType(), out)
+	return c.do(ctx, http.MethodPost, path, &buf, mw.FormDataContentType(), extra, out)
 }
 
 // ── MIME helpers ──────────────────────────────────────────────────────────────

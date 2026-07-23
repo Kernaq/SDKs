@@ -8,7 +8,6 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,13 +15,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Low-level HTTP transport — not part of the public API.
- * Uses java.net.http (Java 11+), no third-party HTTP dependency needed.
+ * Low-level HTTP transport. Uses java.net.http (Java 11+) — no third-party
+ * HTTP dependency required.
  */
 class HttpClient {
 
-    private static final String DEFAULT_BASE_URL = "https://api.kernaq.com/v1";
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
+    private static final String   DEFAULT_BASE_URL = "https://api.kernaq.com/v1";
+    private static final Duration DEFAULT_TIMEOUT  = Duration.ofSeconds(120);
 
     private final String apiKey;
     private final String baseUrl;
@@ -49,25 +48,69 @@ class HttpClient {
         return execute(req, type);
     }
 
-    // ── Multipart POST ────────────────────────────────────────────────────────
+    // ── JSON mutations ────────────────────────────────────────────────────────
 
-    /**
-     * FilePart bundles a field name with a readable file source.
-     */
-    record FilePart(String field, InputStream data, String filename) {}
+    <T> T postJson(String path, Object body, Class<T> type) throws IOException {
+        return jsonRequest("POST", path, body, type);
+    }
 
-    <T> T upload(String path, Map<String, String> fields,
-                 List<FilePart> files, Class<T> type) throws IOException {
-        String boundary = UUID.randomUUID().toString().replace("-", "");
-        var body = buildMultipart(boundary, fields, files);
+    <T> T putJson(String path, Object body, Class<T> type) throws IOException {
+        return jsonRequest("PUT", path, body, type);
+    }
 
+    <T> T patchJson(String path, Object body, Class<T> type) throws IOException {
+        return jsonRequest("PATCH", path, body, type);
+    }
+
+    void delete(String path) throws IOException {
         var req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
                 .header("X-API-Key", apiKey)
                 .header("Accept", "application/json")
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+                .DELETE()
                 .build();
+        execute(req, Map.class);
+    }
+
+    private <T> T jsonRequest(String method, String path, Object body, Class<T> type) throws IOException {
+        byte[] json = mapper.writeValueAsBytes(body);
+        var req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .header("X-API-Key", apiKey)
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofByteArray(json))
+                .build();
+        return execute(req, type);
+    }
+
+    // ── Multipart POST ────────────────────────────────────────────────────────
+
+    record FilePart(String field, InputStream data, String filename) {}
+
+    <T> T upload(String path, Map<String, String> fields,
+                 List<FilePart> files, Class<T> type) throws IOException {
+        return uploadWithHeaders(path, fields, files, Map.of(), type);
+    }
+
+    /** Upload with optional extra headers (e.g. X-Capture-Token, X-Capture-Nonce). */
+    <T> T uploadWithHeaders(String path, Map<String, String> fields,
+                            List<FilePart> files, Map<String, String> extraHeaders,
+                            Class<T> type) throws IOException {
+        String boundary = UUID.randomUUID().toString().replace("-", "");
+        byte[] body     = buildMultipart(boundary, fields, files);
+
+        var builder = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .header("X-API-Key", apiKey)
+                .header("Accept", "application/json")
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+        for (var e : extraHeaders.entrySet()) {
+            builder.header(e.getKey(), e.getValue());
+        }
+
+        var req = builder.POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
         return execute(req, type);
     }
 
@@ -93,30 +136,32 @@ class HttpClient {
             throw new KernaqError(code, message, resp.statusCode());
         }
 
+        if (type == null || type == Void.class) return null;
         return mapper.readValue(resp.body(), type);
     }
 
     private byte[] buildMultipart(String boundary, Map<String, String> fields,
                                    List<FilePart> files) throws IOException {
-        var buf = new ArrayList<byte[]>();
+        var buf  = new ArrayList<byte[]>();
         var CRLF = "\r\n";
         var DASH = "--";
 
         for (var e : fields.entrySet()) {
             buf.add((DASH + boundary + CRLF +
                     "Content-Disposition: form-data; name=\"" + e.getKey() + "\"" + CRLF +
-                    CRLF + e.getValue() + CRLF).getBytes(StandardCharsets.UTF_8));
+                    CRLF + e.getValue() + CRLF)
+                    .getBytes(StandardCharsets.UTF_8));
         }
-
         for (var f : files) {
             String mime = mimeFromName(f.filename());
             buf.add((DASH + boundary + CRLF +
-                    "Content-Disposition: form-data; name=\"" + f.field() + "\"; filename=\"" + f.filename() + "\"" + CRLF +
-                    "Content-Type: " + mime + CRLF + CRLF).getBytes(StandardCharsets.UTF_8));
+                    "Content-Disposition: form-data; name=\"" + f.field() +
+                    "\"; filename=\"" + f.filename() + "\"" + CRLF +
+                    "Content-Type: " + mime + CRLF + CRLF)
+                    .getBytes(StandardCharsets.UTF_8));
             buf.add(f.data().readAllBytes());
             buf.add(CRLF.getBytes(StandardCharsets.UTF_8));
         }
-
         buf.add((DASH + boundary + DASH + CRLF).getBytes(StandardCharsets.UTF_8));
 
         int total = buf.stream().mapToInt(b -> b.length).sum();
@@ -127,7 +172,8 @@ class HttpClient {
     }
 
     private static String mimeFromName(String name) {
-        String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
+        String ext = name.contains(".")
+                ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
         return switch (ext) {
             case "jpg", "jpeg" -> "image/jpeg";
             case "png"         -> "image/png";

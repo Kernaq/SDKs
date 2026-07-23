@@ -96,7 +96,7 @@ export class KernaqCapture {
 
   /**
    * Submit a verification with cryptographic proof of origin.
-   * Attaches X-Capture-Token automatically.
+   * Attaches X-Capture-Token and X-Capture-Nonce automatically.
    */
   async submit(opts: SubmitVerificationOptions): Promise<SubmitVerificationResponse> {
     return submitVerification(opts, this.config.identityApiUrl)
