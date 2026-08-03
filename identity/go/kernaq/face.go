@@ -2,18 +2,15 @@ package kernaq
 
 import "context"
 
-// FaceResource handles /v1/face.
+// FaceResource handles stateless face detection and matching endpoints.
 type FaceResource struct {
 	c *client
 }
 
-// Detect detects a face in an image and returns bounding box + attributes.
+// Detect detects the primary face in an image and returns attributes. Nothing stored.
 func (r *FaceResource) Detect(ctx context.Context, req FaceDetectRequest) (*FaceDetectResponse, error) {
-	name := nameOr(req.ImageName, "image.jpg")
-	files := []filePart{
-		{field: "image", reader: req.Image, filename: name, mime: mimeFromName(name)},
-	}
-
+	imgName := nameOr(req.ImageName, "image.jpg")
+	files := []filePart{{field: "image", reader: req.Image, filename: imgName, mime: mimeFromName(imgName)}}
 	var out FaceDetectResponse
 	if err := r.c.upload(ctx, "/face/detect", nil, files, &out); err != nil {
 		return nil, err
@@ -21,15 +18,15 @@ func (r *FaceResource) Detect(ctx context.Context, req FaceDetectRequest) (*Face
 	return &out, nil
 }
 
-// Match compares two face images and returns a similarity score.
+// Match compares two face images. Returns matched + confidence. Nothing stored.
+// ImageA is sent as "face_a", ImageB as "face_b".
 func (r *FaceResource) Match(ctx context.Context, req FaceMatchRequest) (*FaceMatchResponse, error) {
-	nameA := nameOr(req.ImageAName, "image_a.jpg")
-	nameB := nameOr(req.ImageBName, "image_b.jpg")
+	aName := nameOr(req.ImageAName, "face_a.jpg")
+	bName := nameOr(req.ImageBName, "face_b.jpg")
 	files := []filePart{
-		{field: "image_a", reader: req.ImageA, filename: nameA, mime: mimeFromName(nameA)},
-		{field: "image_b", reader: req.ImageB, filename: nameB, mime: mimeFromName(nameB)},
+		{field: "face_a", reader: req.ImageA, filename: aName, mime: mimeFromName(aName)},
+		{field: "face_b", reader: req.ImageB, filename: bName, mime: mimeFromName(bName)},
 	}
-
 	var out FaceMatchResponse
 	if err := r.c.upload(ctx, "/face/match", nil, files, &out); err != nil {
 		return nil, err

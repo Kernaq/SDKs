@@ -1,74 +1,85 @@
 """
-kernaq-identity — Official Python SDK for the Kernaq Identity API.
+kernaq — Official Python SDK for the Kernaq Identity API.
 
-Quick start::
+Process-and-forget model: submit → result in 3-8s → nothing stored.
+
+Usage::
 
     from kernaq import Kernaq
 
-    client = Kernaq()                   # reads KERNAQ_API_KEY from env
-    # or
-    client = Kernaq(api_key="k_test_…")
+    client = Kernaq()  # reads KERNAQ_API_KEY from env
 
-    result = client.verifications.submit_and_wait(
+    # Full KYC pipeline
+    result = client.verify.run(
         document=open("id.jpg", "rb"),
         selfie=open("selfie.jpg", "rb"),
         video=open("liveness.mp4", "rb"),
-        document_type="passport",
+        document_type="national_id",
         country="KEN",
-        reference="user_acct_123",
     )
+    print(result.verdict)      # "pass" | "fail" | "review"
+    print(result.score)        # 0-100
+    print(result.face_match)   # True
+    print(result.document_fields.name)
 
-    print(result.status)                # "verified"
-    print(result.face.matched)          # True
-    print(result.risk.level)            # "low"
+    # Sandbox (no billing)
+    result = client.verify.sandbox(document=..., selfie=..., video=...)
 
-    # When failed, check the reason without inspecting sub-entities:
-    if result.status == "failed":
-        print(result.failure_reason)    # e.g. "face_mismatch"
+    # Standalone OCR
+    fields = client.documents.extract(document=open("id.jpg", "rb"))
+
+    # Face match
+    match = client.face.match(face_a=open("a.jpg","rb"), face_b=open("b.jpg","rb"))
+
+    # Usage stats
+    stats = client.usage.get(days=30)
 """
 
-from .client import Kernaq
-from .exceptions import KernaqError
+from .client import (
+    Kernaq,
+    VerifyResource,
+    DocumentsResource,
+    FaceResource,
+    LivenessResource,
+    UsageResource,
+)
+
 from .types import (
-    VerificationResult,
-    VerificationSummary,
-    ListVerificationsResult,
-    VerificationStatus,
-    FailureReason,
-    ExtractedFields,
+    VerifyResult,
+    DocumentFields,
+    ExtractDocumentResult,
+    ValidateDocumentResult,
     FaceDetectResult,
     FaceMatchResult,
     LivenessResult,
-    LivenessDetails,
-    ExtractDocumentResult,
-    ValidateDocumentResult,
-    Webhook,
-    WebhookCreatedResponse,
-    WebhookDelivery,
-    CaptureSessionResult,
-    ProjectSettings,
+    UsageSummary,
+    DailyUsage,
+    BoundingBox,
 )
+
+from .exceptions import KernaqError, AuthenticationError, RateLimitError, InsufficientCreditsError
 
 __all__ = [
     "Kernaq",
-    "KernaqError",
-    "VerificationResult",
-    "VerificationSummary",
-    "ListVerificationsResult",
-    "VerificationStatus",
-    "FailureReason",
-    "ExtractedFields",
+    "VerifyResource",
+    "DocumentsResource",
+    "FaceResource",
+    "LivenessResource",
+    "UsageResource",
+    "VerifyResult",
+    "DocumentFields",
+    "ExtractDocumentResult",
+    "ValidateDocumentResult",
     "FaceDetectResult",
     "FaceMatchResult",
     "LivenessResult",
-    "LivenessDetails",
-    "ExtractDocumentResult",
-    "ValidateDocumentResult",
-    "Webhook",
-    "WebhookCreatedResponse",
-    "WebhookDelivery",
-    "CaptureSessionResult",
-    "ProjectSettings",
+    "UsageSummary",
+    "DailyUsage",
+    "BoundingBox",
+    "KernaqError",
+    "AuthenticationError",
+    "RateLimitError",
+    "InsufficientCreditsError",
 ]
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

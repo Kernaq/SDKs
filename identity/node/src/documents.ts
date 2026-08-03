@@ -17,7 +17,7 @@ export class DocumentsResource extends BaseClient {
    *   documentType: 'passport',
    *   country:      'GBR',
    * })
-   * console.log(data.fields.first_name) // 'John'
+   * console.log(data.fields.document_number)
    */
   extract(req: ExtractDocumentRequest): Promise<ExtractDocumentResponse> {
     const fields: Record<string, string> = {}

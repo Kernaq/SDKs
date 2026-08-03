@@ -1,6 +1,6 @@
 /**
  * Kernaq Identity API — shared types.
- * Shapes confirmed against live API spec (OpenAPI 1.0.0, July 2026).
+ * Synchronous process-and-forget model (v2).
  */
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -63,26 +63,42 @@ export type DocumentType =
   | 'tenancy_agreement'
   | 'other'
 
-// ── Verification ──────────────────────────────────────────────────────────────
+// ── VerifyResult — returned synchronously by POST /v1/verify ─────────────────
 
-export type VerificationStatus =
-  | 'pending'
-  | 'processing'
-  | 'verified'
-  | 'failed'
-  | 'review'
+export type Verdict = 'pass' | 'fail' | 'review'
 
-/** Machine-readable reason set when status == "failed". */
-export type FailureReason =
-  | 'pipeline_timeout'
-  | 'pipeline_error'
-  | 'face_mismatch'
-  | 'liveness_failed'
-  | 'document_invalid'
-  | 'high_risk'
-  | 'fraud_detected'
+/** Parsed document fields extracted from the ID. */
+export interface DocumentFields {
+  name?:            string
+  date_of_birth?:   string
+  document_number?: string
+  expiry_date?:     string
+  country?:         string
+  document_type?:   string
+  is_valid?:        boolean
+}
 
-export interface SubmitVerificationRequest {
+/**
+ * Full result returned synchronously (200 OK) by POST /v1/verify
+ * and POST /v1/verify/sandbox.
+ * On unprocessable input the server returns 422 with an error body instead.
+ */
+export interface VerifyResult {
+  request_id:       string
+  verdict:          Verdict
+  score:            number   // 0–100
+  face_match:       boolean
+  face_confidence:  number
+  liveness_pass:    boolean
+  document_fields:  DocumentFields
+  fraud_flags:      string[]
+  failure_reason?:  string
+  duration_ms:      number
+}
+
+// ── Verify request ────────────────────────────────────────────────────────────
+
+export interface VerifyRequest {
   /** Government-issued ID image (Buffer, ReadableStream, Blob, or ArrayBuffer). */
   document:     Buffer | ReadableStream | Blob | ArrayBuffer
   documentName?: string
@@ -91,10 +107,8 @@ export interface SubmitVerificationRequest {
   selfieName?:  string
 
   // ── Liveness — provide either video OR all three frames ───────────────────
-  /** Liveness video (MP4, MOV, or WebM). */
   video?:       Buffer | ReadableStream | Blob | ArrayBuffer
   videoName?:   string
-  /** Low-bandwidth alternative: 3 JPEG frames instead of a video. */
   frame1?:      Buffer | ReadableStream | Blob | ArrayBuffer
   frame1Name?:  string
   frame2?:      Buffer | ReadableStream | Blob | ArrayBuffer
@@ -102,117 +116,10 @@ export interface SubmitVerificationRequest {
   frame3?:      Buffer | ReadableStream | Blob | ArrayBuffer
   frame3Name?:  string
 
-  documentType: DocumentType
+  /** Document type string, e.g. "passport", "national_id". */
+  documentType: string
   /** ISO 3166-1 alpha-3 country code, e.g. "KEN". */
   country:      string
-  /** Your unique reference for this user — idempotency key. 1–255 chars, [a-zA-Z0-9_-.] */
-  reference:    string
-  externalUserId?: string
-
-  // ── DPA 2019 consent metadata (optional) ─────────────────────────────────
-  consentReference?: string
-  consentAt?:        string  // ISO 8601 datetime
-  consentType?:      string  // e.g. "explicit", "legitimate_interest"
-
-  // ── Capture session (when project.require_capture_token = true) ───────────
-  captureToken?: string
-  captureNonce?: string
-}
-
-export interface SubmitVerificationResponse {
-  verification_id: string
-  reference:       string
-  status:          VerificationStatus
-  message:         string
-}
-
-export interface VerificationStatusResponse {
-  verification_id: string
-  status:          VerificationStatus
-  failure_reason?: FailureReason
-}
-
-export interface ExtractedFields {
-  first_name?:      string
-  last_name?:       string
-  document_number?: string
-  date_of_birth?:   string
-  expiry_date?:     string
-  country?:         string
-  raw_fields?:      Record<string, unknown>
-}
-
-export interface VerificationDocument {
-  valid:           boolean
-  type:            string
-  extracted_data?: ExtractedFields
-}
-
-export interface VerificationFace {
-  matched:    boolean
-  confidence: number
-}
-
-export interface VerificationLiveness {
-  passed: boolean
-}
-
-/** Movement analysis details returned inside LivenessCheckResponse.details */
-export interface LivenessDetails {
-  mode:              'video' | 'frame_sequence'
-  detected_frames:   number
-  extracted_frames:  number
-  delta_yaw:         number
-  delta_pitch:       number
-  delta_roll:        number
-  movement_detected: boolean
-}
-
-export interface VerificationRisk {
-  level: 'low' | 'medium' | 'high' | 'unknown'
-}
-
-export interface VerificationResult {
-  verification_id: string
-  status:          VerificationStatus
-  /** Set when status == "failed". Tells you exactly why without inspecting sub-entities. */
-  failure_reason?: FailureReason
-  confidence?:     number
-  document?:       VerificationDocument
-  face?:           VerificationFace
-  liveness?:       VerificationLiveness
-  risk?:           VerificationRisk
-}
-
-export type VerificationReport = Record<string, unknown>
-
-export interface VerificationSummary {
-  verification_id:  string
-  reference:        string
-  status:           VerificationStatus
-  failure_reason?:  FailureReason
-  confidence?:      number
-  created_at:       string
-}
-
-export interface ListVerificationsResponse {
-  verifications: VerificationSummary[]
-  next_cursor?:  string
-}
-
-export interface ListVerificationsOptions {
-  limit?:  number
-  before?: string
-  /** Filter by status. Omit to return all statuses. */
-  status?: VerificationStatus
-}
-
-// ── Poll options ──────────────────────────────────────────────────────────────
-
-export interface PollOptions {
-  intervalMs?: number  // default 2000
-  timeoutMs?:  number  // default 180_000
-  onStatus?:   (status: VerificationStatus) => void
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────
@@ -226,7 +133,7 @@ export interface ExtractDocumentRequest {
 
 export interface ExtractDocumentResponse {
   document_type: string
-  fields:        ExtractedFields
+  fields:        DocumentFields
   raw_lines?:    string[]
   processed_at:  string
 }
@@ -271,10 +178,12 @@ export interface FaceDetectResponse {
 }
 
 export interface FaceMatchRequest {
-  imageA:      Buffer | ReadableStream | Blob | ArrayBuffer
-  imageAName?: string
-  imageB:      Buffer | ReadableStream | Blob | ArrayBuffer
-  imageBName?: string
+  /** First face image — sent as field `face_a`. */
+  faceA:      Buffer | ReadableStream | Blob | ArrayBuffer
+  faceAName?: string
+  /** Second face image — sent as field `face_b`. */
+  faceB:      Buffer | ReadableStream | Blob | ArrayBuffer
+  faceBName?: string
 }
 
 export interface FaceMatchResponse {
@@ -285,9 +194,28 @@ export interface FaceMatchResponse {
 
 // ── Liveness ──────────────────────────────────────────────────────────────────
 
+/** Movement analysis details returned inside LivenessCheckResponse.details */
+export interface LivenessDetails {
+  mode:              'video' | 'frame_sequence'
+  detected_frames:   number
+  extracted_frames:  number
+  delta_yaw:         number
+  delta_pitch:       number
+  delta_roll:        number
+  movement_detected: boolean
+}
+
 export interface LivenessCheckRequest {
-  video:      Buffer | ReadableStream | Blob | ArrayBuffer
-  videoName?: string
+  /** Liveness video (MP4, MOV, WebM). Takes priority over frames. */
+  video?:      Buffer | ReadableStream | Blob | ArrayBuffer
+  videoName?:  string
+  /** Low-bandwidth alternative: 3 JPEG frames instead of a video. */
+  frame1?:     Buffer | ReadableStream | Blob | ArrayBuffer
+  frame1Name?: string
+  frame2?:     Buffer | ReadableStream | Blob | ArrayBuffer
+  frame2Name?: string
+  frame3?:     Buffer | ReadableStream | Blob | ArrayBuffer
+  frame3Name?: string
 }
 
 export interface LivenessCheckResponse {
@@ -297,111 +225,15 @@ export interface LivenessCheckResponse {
   processed_at: string
 }
 
-// ── Webhooks ──────────────────────────────────────────────────────────────────
+// ── Usage ─────────────────────────────────────────────────────────────────────
 
-export type WebhookEvent =
-  | 'verification.completed'
-  | 'verification.failed'
-  | 'verification.review'
-
-export interface CreateWebhookRequest {
-  /** HTTPS URL that will receive POST requests */
-  url:    string
-  events: WebhookEvent[]
+export interface DailyUsage {
+  date:  string  // ISO 8601 date, e.g. "2025-07-10"
+  count: number
 }
 
-export interface WebhookCreatedResponse {
-  id:         string
-  url:        string
-  events:     WebhookEvent[]
-  is_active:  boolean
-  /** HMAC-SHA256 signing secret — shown ONCE on creation. Store it securely. */
-  secret:     string
-  created_at: string
-  message:    string
-}
-
-export interface Webhook {
-  id:         string
-  url:        string
-  events:     WebhookEvent[]
-  is_active:  boolean
-  created_at: string
-}
-
-export interface WebhookListResponse {
-  webhooks: Webhook[]
-  total:    number
-}
-
-export interface UpdateWebhookRequest {
-  url?:       string
-  events?:    WebhookEvent[]
-  is_active?: boolean
-}
-
-export interface RotateSecretResponse {
-  id:      string
-  secret:  string
-  message: string
-}
-
-export type WebhookDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'abandoned'
-
-export interface WebhookDelivery {
-  id:            string
-  event_type:    string
-  event_id:      string
-  status:        WebhookDeliveryStatus
-  attempts:      number
-  max_attempts:  number
-  next_attempt?: string
-  last_error?:   string
-  delivered_at?: string
-  created_at:    string
-}
-
-export interface WebhookDeliveryListResponse {
-  deliveries: WebhookDelivery[]
-  total:      number
-}
-
-// ── Capture sessions ──────────────────────────────────────────────────────────
-
-export interface CreateCaptureSessionRequest {
-  /** Ties the session to a specific user or flow. Same as verification reference. */
-  reference:   string
-  device_info?: string
-}
-
-export interface CaptureSessionResponse {
-  session_id:  string
-  /** 64-char hex token. Pass to the capture SDK. Include as X-Capture-Token on submit. */
-  token:       string
-  /** 32-char hex nonce. Include as X-Capture-Nonce on submit. Single-use. */
-  nonce:       string
-  expires_at:  string
-  ttl_seconds: number
-  message:     string
-}
-
-// ── Project settings ──────────────────────────────────────────────────────────
-
-export interface ProjectSettings {
-  project_id:                  string
-  risk_threshold_medium:       number
-  risk_threshold_high:         number
-  max_attempts_per_reference:  number
-  require_capture_token:       boolean
-  enable_cross_project_dedup:  boolean
-  created_at:                  string
-  updated_at:                  string
-}
-
-export interface UpdateSettingsRequest {
-  risk_threshold_medium?:      number
-  risk_threshold_high?:        number
-  max_attempts_per_reference?: number
-  require_capture_token?:      boolean
-  enable_cross_project_dedup?: boolean
+export interface UsageSummary {
+  total_calls: number
+  days:        number
+  daily:       DailyUsage[]
 }

@@ -3,170 +3,133 @@ package kernaq
 import (
 	"context"
 	"fmt"
-	"time"
+	"io"
 )
 
-// VerificationsResource handles /v1/verifications.
-type VerificationsResource struct {
+// VerifyResource handles the synchronous KYC pipeline.
+// POST /v1/verify and POST /v1/verify/sandbox.
+type VerifyResource struct {
 	c *client
 }
 
-var terminalStatuses = map[VerificationStatus]bool{
-	VerificationStatusVerified: true,
-	VerificationStatusFailed:   true,
-	VerificationStatusReview:   true,
+// VerifyInput is the input to Verify.Run and Verify.Sandbox.
+type VerifyInput struct {
+	// Document is the government-issued ID photo (JPEG, PNG, PDF).
+	Document         io.Reader
+	DocumentFilename string // default: "document.jpg"
+
+	// Selfie is the portrait face photo.
+	Selfie         io.Reader
+	SelfieFilename string // default: "selfie.jpg"
+
+	// Liveness: supply Video OR all three Frame fields (low-bandwidth).
+	Video         io.Reader
+	VideoFilename string // default: "liveness.mp4"
+
+	Frame1         io.Reader
+	Frame1Filename string
+	Frame2         io.Reader
+	Frame2Filename string
+	Frame3         io.Reader
+	Frame3Filename string
+
+	// DocumentType: "national_id", "passport", "driver_license", etc.
+	DocumentType string
+	// Country: ISO 3166-1 alpha-3, e.g. "KEN".
+	Country string
 }
 
-// Submit posts a full KYC verification and returns immediately (HTTP 202).
-// Use SubmitAndWait to automatically poll until the pipeline completes.
-//
-// Liveness: supply Video OR all three Frame fields (low-bandwidth alternative).
-func (r *VerificationsResource) Submit(ctx context.Context, req SubmitVerificationRequest) (*SubmitVerificationResponse, error) {
-	fields := map[string]string{
-		"document_type": string(req.DocumentType),
-		"country":       req.Country,
-		"reference":     req.Reference,
-	}
-	if req.ExternalUserID   != "" { fields["external_user_id"]  = req.ExternalUserID }
-	if req.ConsentReference != "" { fields["consent_reference"] = req.ConsentReference }
-	if req.ConsentAt        != "" { fields["consent_at"]        = req.ConsentAt }
-	if req.ConsentType      != "" { fields["consent_type"]      = req.ConsentType }
-
-	docName  := nameOr(req.DocumentName, "document.jpg")
-	selfName := nameOr(req.SelfieName,   "selfie.jpg")
-
-	files := []filePart{
-		{field: "document", reader: req.Document, filename: docName,  mime: mimeFromName(docName)},
-		{field: "selfie",   reader: req.Selfie,   filename: selfName, mime: mimeFromName(selfName)},
-	}
-
-	if req.Video != nil {
-		vidName := nameOr(req.VideoName, "liveness.mp4")
-		files = append(files, filePart{
-			field: "video", reader: req.Video, filename: vidName, mime: mimeFromName(vidName),
-		})
-	} else if req.Frame1 != nil && req.Frame2 != nil && req.Frame3 != nil {
-		f1 := nameOr(req.Frame1Name, "frame_1.jpg")
-		f2 := nameOr(req.Frame2Name, "frame_2.jpg")
-		f3 := nameOr(req.Frame3Name, "frame_3.jpg")
-		files = append(files,
-			filePart{field: "frame_1", reader: req.Frame1, filename: f1, mime: "image/jpeg"},
-			filePart{field: "frame_2", reader: req.Frame2, filename: f2, mime: "image/jpeg"},
-			filePart{field: "frame_3", reader: req.Frame3, filename: f3, mime: "image/jpeg"},
-		)
-	}
-
-	extra := map[string]string{}
-	if req.CaptureToken != "" { extra["X-Capture-Token"] = req.CaptureToken }
-	if req.CaptureNonce != "" { extra["X-Capture-Nonce"] = req.CaptureNonce }
-
-	var out SubmitVerificationResponse
-	if err := r.c.uploadWithHeaders(ctx, "/verifications", fields, files, extra, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+// VerifyResult is returned synchronously by Run and Sandbox.
+// Built in-memory by the server, returned in the HTTP response, never stored.
+type VerifyResult struct {
+	RequestID      string         `json:"request_id"`
+	Verdict        string         `json:"verdict"`          // "pass" | "fail" | "review"
+	Score          int            `json:"score"`            // 0–100
+	FaceMatch      bool           `json:"face_match"`
+	FaceConfidence float64        `json:"face_confidence"`
+	LivenessPass   bool           `json:"liveness_pass"`
+	DocumentFields DocumentFields `json:"document_fields"`
+	FraudFlags     []string       `json:"fraud_flags"`
+	FailureReason  string         `json:"failure_reason,omitempty"`
+	DurationMs     int64          `json:"duration_ms"`
 }
 
-// SubmitAndWait submits a verification and polls until terminal (verified | failed | review).
+// Run submits a full KYC verification in live mode.
+// Deducts one credit. Blocks 3–8 seconds. Returns the result directly.
+// Nothing is stored on Kernaq servers.
 //
 // Example:
 //
-//	result, err := client.Verifications.SubmitAndWait(ctx, SubmitVerificationRequest{
+//	result, err := client.Verify.Run(ctx, kernaq.VerifyInput{
 //	    Document:     docFile,
 //	    Selfie:       selfieFile,
 //	    Video:        videoFile,
-//	    DocumentType: DocumentTypePassport,
+//	    DocumentType: "national_id",
 //	    Country:      "KEN",
-//	    Reference:    "user_acct_123",
-//	}, nil)
-//	if result.Status == VerificationStatusFailed {
-//	    fmt.Println(result.FailureReason) // e.g. "face_mismatch"
+//	})
+//	if err != nil { ... }
+//	if result.Verdict == "pass" {
+//	    fmt.Println(result.DocumentFields.Name)
 //	}
-func (r *VerificationsResource) SubmitAndWait(ctx context.Context, req SubmitVerificationRequest, opts *PollOptions) (*VerificationResult, error) {
-	interval := 2 * time.Second
-	timeout  := 3 * time.Minute
-	var onStatus func(VerificationStatus)
-
-	if opts != nil {
-		if opts.Interval > 0 { interval = opts.Interval }
-		if opts.Timeout  > 0 { timeout  = opts.Timeout }
-		onStatus = opts.OnStatus
-	}
-
-	submitted, err := r.Submit(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	id       := submitted.VerificationID
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(interval):
-		}
-
-		statusRes, err := r.GetStatus(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if onStatus != nil {
-			onStatus(statusRes.Status)
-		}
-		if terminalStatuses[statusRes.Status] {
-			return r.Get(ctx, id)
-		}
-	}
-
-	return nil, fmt.Errorf("kernaq: verification %s did not complete within %s", id, timeout)
+func (r *VerifyResource) Run(ctx context.Context, input VerifyInput) (*VerifyResult, error) {
+	return r.submit(ctx, "/verify", input)
 }
 
-// Get returns the full verification result, including FailureReason when failed.
-func (r *VerificationsResource) Get(ctx context.Context, id string) (*VerificationResult, error) {
-	var out VerificationResult
-	if err := r.c.get(ctx, "/verifications/"+id, &out); err != nil {
+// Sandbox submits a full KYC verification in sandbox mode.
+// Same pipeline, no billing. Use k_test_ API keys.
+func (r *VerifyResource) Sandbox(ctx context.Context, input VerifyInput) (*VerifyResult, error) {
+	return r.submit(ctx, "/verify/sandbox", input)
+}
+
+func (r *VerifyResource) submit(ctx context.Context, path string, input VerifyInput) (*VerifyResult, error) {
+	fields := map[string]string{
+		"document_type": input.DocumentType,
+		"country":       input.Country,
+	}
+
+	docFilename  := nameOr(input.DocumentFilename, "document.jpg")
+	selfFilename := nameOr(input.SelfieFilename,   "selfie.jpg")
+
+	files := []filePart{
+		{field: "document", reader: input.Document, filename: docFilename,  mime: mimeFromName(docFilename)},
+		{field: "selfie",   reader: input.Selfie,   filename: selfFilename, mime: mimeFromName(selfFilename)},
+	}
+
+	if input.Video != nil {
+		vidFilename := nameOr(input.VideoFilename, "liveness.mp4")
+		files = append(files, filePart{
+			field: "video", reader: input.Video, filename: vidFilename, mime: mimeFromName(vidFilename),
+		})
+	} else if input.Frame1 != nil && input.Frame2 != nil && input.Frame3 != nil {
+		f1 := nameOr(input.Frame1Filename, "frame1.jpg")
+		f2 := nameOr(input.Frame2Filename, "frame2.jpg")
+		f3 := nameOr(input.Frame3Filename, "frame3.jpg")
+		files = append(files,
+			filePart{field: "frame1", reader: input.Frame1, filename: f1, mime: "image/jpeg"},
+			filePart{field: "frame2", reader: input.Frame2, filename: f2, mime: "image/jpeg"},
+			filePart{field: "frame3", reader: input.Frame3, filename: f3, mime: "image/jpeg"},
+		)
+	}
+
+	var out VerifyResult
+	if err := r.c.upload(ctx, path, fields, files, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-// GetStatus returns the lightweight status poll result,
-// including FailureReason when status is failed.
-func (r *VerificationsResource) GetStatus(ctx context.Context, id string) (*VerificationStatusResponse, error) {
-	var out VerificationStatusResponse
-	if err := r.c.get(ctx, "/verifications/"+id+"/status", &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+// UsageResource handles GET /v1/usage.
+type UsageResource struct {
+	c *client
 }
 
-// GetReport returns the full verification report once the pipeline has completed.
-func (r *VerificationsResource) GetReport(ctx context.Context, id string) (map[string]interface{}, error) {
-	var out map[string]interface{}
-	if err := r.c.get(ctx, "/verifications/"+id+"/report", &out); err != nil {
-		return nil, err
+// Get returns aggregate usage for the given number of days.
+func (r *UsageResource) Get(ctx context.Context, days int) (*UsageSummary, error) {
+	if days <= 0 {
+		days = 30
 	}
-	return out, nil
-}
-
-// List returns verifications for the authenticated project.
-// Use opts.Status to filter; leave empty to return all statuses.
-func (r *VerificationsResource) List(ctx context.Context, opts *ListVerificationsOptions) (*ListVerificationsResponse, error) {
-	path := "/verifications"
-	if opts != nil {
-		params := ""
-		if opts.Limit  > 0  { params += fmt.Sprintf("limit=%d&", opts.Limit) }
-		if opts.Before != "" { params += fmt.Sprintf("before=%s&", opts.Before) }
-		if opts.Status != "" { params += fmt.Sprintf("status=%s&", string(opts.Status)) }
-		if params != "" {
-			path += "?" + params[:len(params)-1]
-		}
-	}
-
-	var out ListVerificationsResponse
-	if err := r.c.get(ctx, path, &out); err != nil {
+	var out UsageSummary
+	if err := r.c.get(ctx, fmt.Sprintf("/usage?days=%d", days), &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

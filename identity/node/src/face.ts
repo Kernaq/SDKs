@@ -30,27 +30,27 @@ export class FaceResource extends BaseClient {
 
   /**
    * Compare two face images and return a similarity score (synchronous).
-   * Typically used to match the selfie against the photo on the ID document.
+   * Fields sent to the API: `face_a` and `face_b`.
    *
    * @example
    * const result = await kernaq.face.match({
-   *   imageA: fs.createReadStream('id-photo.jpg'),
-   *   imageB: fs.createReadStream('selfie.jpg'),
+   *   faceA: fs.createReadStream('id-photo.jpg'),
+   *   faceB: fs.createReadStream('selfie.jpg'),
    * })
    * console.log(result.matched, result.confidence) // true, 99.2
    */
   match(req: FaceMatchRequest): Promise<FaceMatchResponse> {
     return this.upload<FaceMatchResponse>('/face/match', {}, [
       {
-        field:       'image_a',
-        value:       req.imageA as FileInput,
-        filename:    req.imageAName ?? 'image_a.jpg',
+        field:       'face_a',
+        value:       req.faceA as FileInput,
+        filename:    req.faceAName ?? 'face_a.jpg',
         contentType: 'image/jpeg',
       },
       {
-        field:       'image_b',
-        value:       req.imageB as FileInput,
-        filename:    req.imageBName ?? 'image_b.jpg',
+        field:       'face_b',
+        value:       req.faceB as FileInput,
+        filename:    req.faceBName ?? 'face_b.jpg',
         contentType: 'image/jpeg',
       },
     ])

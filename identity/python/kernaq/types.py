@@ -1,148 +1,114 @@
 """
-Response model classes for the Kernaq Identity API.
-Shapes confirmed against the live API spec (OpenAPI 1.0.0, July 2026).
-All fields are read-only frozen dataclass instances built from raw API JSON.
+Response types for the Kernaq Identity API — process-and-forget model v2.
+All types are immutable frozen dataclasses built from raw API JSON.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 
+# ── Verify result — the main response type ────────────────────────────────────
+
 @dataclass(frozen=True)
-class ExtractedFields:
-    first_name:       Optional[str] = None
-    last_name:        Optional[str] = None
-    document_number:  Optional[str] = None
-    date_of_birth:    Optional[str] = None
-    expiry_date:      Optional[str] = None
-    country:          Optional[str] = None
-    raw_fields:       dict[str, Any] = field(default_factory=dict)
+class DocumentFields:
+    """OCR-extracted text fields from the ID document. Returned to caller, never stored."""
+    name:            Optional[str] = None
+    date_of_birth:   Optional[str] = None
+    document_number: Optional[str] = None
+    expiry_date:     Optional[str] = None
+    country:         Optional[str] = None
+    document_type:   Optional[str] = None
+    nationality:     Optional[str] = None
+    gender:          Optional[str] = None
+    is_valid:        bool = False
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ExtractedFields":
+    def from_dict(cls, d: dict[str, Any]) -> "DocumentFields":
         return cls(
-            first_name      = d.get("first_name"),
-            last_name       = d.get("last_name"),
-            document_number = d.get("document_number"),
+            name            = d.get("name"),
             date_of_birth   = d.get("date_of_birth"),
+            document_number = d.get("document_number"),
             expiry_date     = d.get("expiry_date"),
             country         = d.get("country"),
-            raw_fields      = d.get("raw_fields") or {},
+            document_type   = d.get("document_type"),
+            nationality     = d.get("nationality"),
+            gender          = d.get("gender"),
+            is_valid        = d.get("is_valid", False),
         )
 
 
 @dataclass(frozen=True)
-class VerificationDocument:
-    valid:          bool
-    type:           str
-    extracted_data: Optional[ExtractedFields] = None
+class VerifyResult:
+    """
+    Full result returned synchronously by POST /v1/verify and /v1/verify/sandbox.
+    Built in-memory on the server, returned in the response body, never stored.
+    """
+    request_id:      str
+    verdict:         str              # "pass" | "fail" | "review"
+    score:           int              # 0–100
+    face_match:      bool
+    face_confidence: float
+    liveness_pass:   bool
+    document_fields: DocumentFields
+    fraud_flags:     List[str]
+    failure_reason:  Optional[str]    # set when verdict == "fail"
+    duration_ms:     int
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationDocument":
-        ed = d.get("extracted_data")
+    def from_dict(cls, d: dict[str, Any]) -> "VerifyResult":
         return cls(
-            valid          = d.get("valid", False),
-            type           = d.get("type", ""),
-            extracted_data = ExtractedFields.from_dict(ed) if ed else None,
-        )
-
-
-@dataclass(frozen=True)
-class VerificationFace:
-    matched:    bool
-    confidence: float
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationFace":
-        return cls(matched=d.get("matched", False), confidence=d.get("confidence", 0.0))
-
-
-@dataclass(frozen=True)
-class VerificationLiveness:
-    passed: bool
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationLiveness":
-        return cls(passed=d.get("passed", False))
-
-
-@dataclass(frozen=True)
-class VerificationRisk:
-    level: str  # "low" | "medium" | "high" | "unknown"
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationRisk":
-        return cls(level=d.get("level", "unknown"))
-
-
-# Machine-readable failure reason values — set when status == "failed".
-FailureReason = str  # "pipeline_timeout" | "pipeline_error" | "face_mismatch" |
-                     # "liveness_failed" | "document_invalid" | "high_risk" | "fraud_detected"
-
-VerificationStatus = str  # "pending" | "processing" | "verified" | "failed" | "review"
-
-
-@dataclass(frozen=True)
-class VerificationResult:
-    verification_id: str
-    status:          VerificationStatus
-    confidence:      float = 0.0
-    # Set when status == "failed" — explains why without inspecting sub-entities.
-    failure_reason:  Optional[FailureReason] = None
-    document:        Optional[VerificationDocument] = None
-    face:            Optional[VerificationFace]     = None
-    liveness:        Optional[VerificationLiveness] = None
-    risk:            Optional[VerificationRisk]     = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationResult":
-        doc  = d.get("document")
-        face = d.get("face")
-        liv  = d.get("liveness")
-        risk = d.get("risk")
-        return cls(
-            verification_id = d["verification_id"],
-            status          = d.get("status", ""),
-            confidence      = d.get("confidence", 0.0),
+            request_id      = d.get("request_id", ""),
+            verdict         = d.get("verdict", ""),
+            score           = d.get("score", 0),
+            face_match      = d.get("face_match", False),
+            face_confidence = d.get("face_confidence", 0.0),
+            liveness_pass   = d.get("liveness_pass", False),
+            document_fields = DocumentFields.from_dict(d.get("document_fields") or {}),
+            fraud_flags     = d.get("fraud_flags") or [],
             failure_reason  = d.get("failure_reason"),
-            document        = VerificationDocument.from_dict(doc)  if doc  else None,
-            face            = VerificationFace.from_dict(face)      if face else None,
-            liveness        = VerificationLiveness.from_dict(liv)   if liv  else None,
-            risk            = VerificationRisk.from_dict(risk)      if risk else None,
+            duration_ms     = d.get("duration_ms", 0),
+        )
+
+
+# ── Standalone endpoints ──────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class ExtractDocumentResult:
+    document_type:   str
+    country:         str
+    document_number: Optional[str] = None
+    first_name:      Optional[str] = None
+    last_name:       Optional[str] = None
+    date_of_birth:   Optional[str] = None
+    expiry_date:     Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ExtractDocumentResult":
+        return cls(
+            document_type   = d.get("document_type", ""),
+            country         = d.get("country", ""),
+            document_number = d.get("document_number"),
+            first_name      = d.get("first_name"),
+            last_name       = d.get("last_name"),
+            date_of_birth   = d.get("date_of_birth"),
+            expiry_date     = d.get("expiry_date"),
         )
 
 
 @dataclass(frozen=True)
-class VerificationSummary:
-    verification_id: str
-    reference:       str
-    status:          VerificationStatus
-    confidence:      float = 0.0
-    failure_reason:  Optional[FailureReason] = None
-    created_at:      str = ""
+class ValidateDocumentResult:
+    valid:           bool
+    reason:          str
+    document_number: Optional[str] = None
+    expiry_date:     Optional[str] = None
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "VerificationSummary":
+    def from_dict(cls, d: dict[str, Any]) -> "ValidateDocumentResult":
         return cls(
-            verification_id = d["verification_id"],
-            reference       = d.get("reference", ""),
-            status          = d.get("status", ""),
-            confidence      = d.get("confidence", 0.0),
-            failure_reason  = d.get("failure_reason"),
-            created_at      = d.get("created_at", ""),
-        )
-
-
-@dataclass(frozen=True)
-class ListVerificationsResult:
-    verifications: List[VerificationSummary]
-    next_cursor:   Optional[str] = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ListVerificationsResult":
-        return cls(
-            verifications = [VerificationSummary.from_dict(v) for v in d.get("verifications", [])],
-            next_cursor   = d.get("next_cursor"),
+            valid           = d.get("valid", False),
+            reason          = d.get("reason", ""),
+            document_number = d.get("document_number"),
+            expiry_date     = d.get("expiry_date"),
         )
 
 
@@ -166,8 +132,9 @@ class FaceDetectResult:
     age_range_low:  Optional[int]         = None
     age_range_high: Optional[int]         = None
     gender:         Optional[str]         = None
-    attributes:     dict[str, Any]        = field(default_factory=dict)
-    processed_at:   str                   = ""
+    smile:          bool                  = False
+    sunglasses:     bool                  = False
+    eyes_open:      bool                  = False
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "FaceDetectResult":
@@ -179,220 +146,65 @@ class FaceDetectResult:
             age_range_low  = d.get("age_range_low"),
             age_range_high = d.get("age_range_high"),
             gender         = d.get("gender"),
-            attributes     = d.get("attributes") or {},
-            processed_at   = d.get("processed_at", ""),
+            smile          = d.get("smile", False),
+            sunglasses     = d.get("sunglasses", False),
+            eyes_open      = d.get("eyes_open", False),
         )
 
 
 @dataclass(frozen=True)
 class FaceMatchResult:
-    matched:      bool
-    confidence:   float
-    processed_at: str = ""
+    matched:    bool
+    confidence: float
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "FaceMatchResult":
-        return cls(
-            matched      = d.get("matched", False),
-            confidence   = d.get("confidence", 0.0),
-            processed_at = d.get("processed_at", ""),
-        )
-
-
-@dataclass(frozen=True)
-class LivenessDetails:
-    """Movement analysis data from a liveness check."""
-    mode:              str   = ""
-    detected_frames:   int   = 0
-    extracted_frames:  int   = 0
-    delta_yaw:         float = 0.0
-    delta_pitch:       float = 0.0
-    delta_roll:        float = 0.0
-    movement_detected: bool  = False
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "LivenessDetails":
-        return cls(
-            mode              = d.get("mode", ""),
-            detected_frames   = d.get("detected_frames", 0),
-            extracted_frames  = d.get("extracted_frames", 0),
-            delta_yaw         = d.get("delta_yaw", 0.0),
-            delta_pitch       = d.get("delta_pitch", 0.0),
-            delta_roll        = d.get("delta_roll", 0.0),
-            movement_detected = d.get("movement_detected", False),
-        )
+        return cls(matched=d.get("matched", False), confidence=d.get("confidence", 0.0))
 
 
 @dataclass(frozen=True)
 class LivenessResult:
-    passed:       bool
-    confidence:   float = 0.0
-    details:      Optional[LivenessDetails] = None
-    processed_at: str = ""
+    passed:     bool
+    confidence: float = 0.0
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "LivenessResult":
-        det = d.get("details")
+        return cls(passed=d.get("passed", False), confidence=d.get("confidence", 0.0))
+
+
+# ── Usage (non-PII) ───────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class DailyUsage:
+    date:    str
+    total:   int
+    success: int
+    failed:  int
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "DailyUsage":
         return cls(
-            passed       = d.get("passed", False),
-            confidence   = d.get("confidence", 0.0),
-            details      = LivenessDetails.from_dict(det) if det else None,
-            processed_at = d.get("processed_at", ""),
+            date    = d.get("date", ""),
+            total   = d.get("total", 0),
+            success = d.get("success", 0),
+            failed  = d.get("failed", 0),
         )
 
 
 @dataclass(frozen=True)
-class ExtractDocumentResult:
-    document_type: str
-    fields:        ExtractedFields
-    raw_lines:     List[str]
-    processed_at:  str
+class UsageSummary:
+    total_calls:    int
+    success_calls:  int
+    failed_calls:   int
+    avg_duration_ms: float
+    by_day:         List[DailyUsage] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ExtractDocumentResult":
+    def from_dict(cls, d: dict[str, Any]) -> "UsageSummary":
         return cls(
-            document_type = d.get("document_type", ""),
-            fields        = ExtractedFields.from_dict(d.get("fields") or {}),
-            raw_lines     = d.get("raw_lines") or [],
-            processed_at  = d.get("processed_at", ""),
-        )
-
-
-@dataclass(frozen=True)
-class ValidateDocumentResult:
-    valid:         bool
-    document_type: str
-    flags:         List[str]
-    processed_at:  str
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ValidateDocumentResult":
-        return cls(
-            valid         = d.get("valid", False),
-            document_type = d.get("document_type", ""),
-            flags         = d.get("flags") or [],
-            processed_at  = d.get("processed_at", ""),
-        )
-
-
-# ── Webhooks ───────────────────────────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class Webhook:
-    id:         str
-    url:        str
-    events:     List[str]
-    is_active:  bool
-    created_at: str
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Webhook":
-        return cls(
-            id         = d["id"],
-            url        = d.get("url", ""),
-            events     = d.get("events") or [],
-            is_active  = d.get("is_active", True),
-            created_at = d.get("created_at", ""),
-        )
-
-
-@dataclass(frozen=True)
-class WebhookCreatedResponse:
-    id:         str
-    url:        str
-    events:     List[str]
-    is_active:  bool
-    secret:     str  # shown once — store securely
-    created_at: str
-    message:    str
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "WebhookCreatedResponse":
-        return cls(
-            id         = d["id"],
-            url        = d.get("url", ""),
-            events     = d.get("events") or [],
-            is_active  = d.get("is_active", True),
-            secret     = d.get("secret", ""),
-            created_at = d.get("created_at", ""),
-            message    = d.get("message", ""),
-        )
-
-
-@dataclass(frozen=True)
-class WebhookDelivery:
-    id:            str
-    event_type:    str
-    event_id:      str
-    status:        str  # "pending" | "delivered" | "failed" | "abandoned"
-    attempts:      int
-    max_attempts:  int
-    next_attempt:  Optional[str] = None
-    last_error:    Optional[str] = None
-    delivered_at:  Optional[str] = None
-    created_at:    str = ""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "WebhookDelivery":
-        return cls(
-            id           = d["id"],
-            event_type   = d.get("event_type", ""),
-            event_id     = d.get("event_id", ""),
-            status       = d.get("status", ""),
-            attempts     = d.get("attempts", 0),
-            max_attempts = d.get("max_attempts", 5),
-            next_attempt = d.get("next_attempt"),
-            last_error   = d.get("last_error"),
-            delivered_at = d.get("delivered_at"),
-            created_at   = d.get("created_at", ""),
-        )
-
-
-# ── Capture sessions ──────────────────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class CaptureSessionResult:
-    session_id:  str
-    token:       str  # 64-char hex — pass to capture SDK as X-Capture-Token
-    nonce:       str  # 32-char hex — pass as X-Capture-Nonce, single-use
-    expires_at:  str
-    ttl_seconds: int
-    message:     str
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CaptureSessionResult":
-        return cls(
-            session_id  = d.get("session_id", ""),
-            token       = d.get("token", ""),
-            nonce       = d.get("nonce", ""),
-            expires_at  = d.get("expires_at", ""),
-            ttl_seconds = d.get("ttl_seconds", 900),
-            message     = d.get("message", ""),
-        )
-
-
-# ── Project settings ──────────────────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class ProjectSettings:
-    project_id:                 str
-    risk_threshold_medium:      float
-    risk_threshold_high:        float
-    max_attempts_per_reference: int
-    require_capture_token:      bool
-    enable_cross_project_dedup: bool
-    created_at:                 str
-    updated_at:                 str
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ProjectSettings":
-        return cls(
-            project_id                 = d.get("project_id", ""),
-            risk_threshold_medium      = d.get("risk_threshold_medium", 20.0),
-            risk_threshold_high        = d.get("risk_threshold_high", 60.0),
-            max_attempts_per_reference = d.get("max_attempts_per_reference", 3),
-            require_capture_token      = d.get("require_capture_token", False),
-            enable_cross_project_dedup = d.get("enable_cross_project_dedup", False),
-            created_at                 = d.get("created_at", ""),
-            updated_at                 = d.get("updated_at", ""),
+            total_calls     = d.get("total_calls", 0),
+            success_calls   = d.get("success_calls", 0),
+            failed_calls    = d.get("failed_calls", 0),
+            avg_duration_ms = d.get("avg_duration_ms", 0.0),
+            by_day          = [DailyUsage.from_dict(x) for x in (d.get("by_day") or [])],
         )
