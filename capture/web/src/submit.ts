@@ -1,24 +1,22 @@
 /**
  * Submits a captured verification to the Kernaq Identity API.
  *
- * This runs server-side (from your backend) using the API key.
- * The browser SDK captures and quality-checks the files, then passes
- * the blobs to your backend which calls this function with the API key.
+ * Called from YOUR BACKEND, not the browser. The browser SDK captures
+ * and quality-checks the files, then sends the blobs to your backend
+ * which calls this function with the API key.
  *
- * Supports two liveness modes:
- *  - Standard:         supply `video`
- *  - Low-bandwidth:    supply `frame1` + `frame2` + `frame3`
+ * @param opts    - Captured files and verification parameters
+ * @param apiUrl  - Your backend sets this from its own env (KERNAQ_API_URL).
+ *                  Defaults to the Kernaq Identity API base URL.
  */
 import type { SubmitVerificationOptions, SubmitVerificationResponse } from './types'
 import { makeError } from './errors'
 
-const DEFAULT_API_URL = 'https://api.identity.kernaq.com/v1'
-
 export async function submitVerification(
   opts: SubmitVerificationOptions,
-  identityApiUrl: string = DEFAULT_API_URL,
+  apiUrl: string,
 ): Promise<SubmitVerificationResponse> {
-  const base = identityApiUrl.replace(/\/$/, '')
+  const base = apiUrl.replace(/\/$/, '')
 
   const form = new FormData()
   form.append('document',      opts.document,  opts.documentName ?? 'document.jpg')
@@ -32,7 +30,6 @@ export async function submitVerification(
   if (opts.consentAt)        form.append('consent_at',        opts.consentAt)
   if (opts.consentType)      form.append('consent_type',      opts.consentType)
 
-  // Liveness: video OR 3-frame sequence
   if (opts.video) {
     form.append('video', opts.video, opts.videoName ?? 'liveness.webm')
   } else if (opts.frame1 && opts.frame2 && opts.frame3) {
@@ -45,8 +42,7 @@ export async function submitVerification(
   try {
     res = await fetch(`${base}/verify`, {
       method: 'POST',
-      // Do NOT set Content-Type — browser sets it with boundary automatically.
-      body: form,
+      body:   form,
     })
   } catch {
     throw makeError('SUBMISSION_FAILED', 'Network error while submitting verification')

@@ -63,7 +63,9 @@ export class BaseClient {
       } else if (value instanceof ArrayBuffer) {
         blob = new Blob([value], { type: contentType })
       } else if (Buffer.isBuffer(value)) {
-        blob = new Blob([value], { type: contentType })
+        // Copy Buffer into a plain ArrayBuffer to satisfy TypeScript's strict BlobPart type
+        const ab = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer
+        blob = new Blob([ab], { type: contentType })
       } else {
         // ReadableStream — collect chunks
         const chunks: Uint8Array[] = []
@@ -73,7 +75,11 @@ export class BaseClient {
           if (done) break
           chunks.push(chunk)
         }
-        blob = new Blob(chunks, { type: contentType })
+        // Convert each chunk's underlying buffer to plain ArrayBuffer
+        const parts = chunks.map(c =>
+          c.buffer.slice(c.byteOffset, c.byteOffset + c.byteLength) as ArrayBuffer
+        )
+        blob = new Blob(parts, { type: contentType })
       }
       form.append(field, new File([blob], filename, { type: contentType }))
     }
