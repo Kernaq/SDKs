@@ -1,16 +1,15 @@
 /**
- * Submits a verification to Kernaq Identity API with the capture session token
- * attached as X-Capture-Token + X-Capture-Nonce. This proves the payload came
- * from a real device running the Kernaq SDK — blocking virtual cameras and scripts.
+ * Submits a captured verification to the Kernaq Identity API.
+ *
+ * This runs server-side (from your backend) using the API key.
+ * The browser SDK captures and quality-checks the files, then passes
+ * the blobs to your backend which calls this function with the API key.
  *
  * Supports two liveness modes:
- *  - Standard: supply `video`
- *  - Low-bandwidth (2G/3G): supply `frame1` + `frame2` + `frame3`
+ *  - Standard:         supply `video`
+ *  - Low-bandwidth:    supply `frame1` + `frame2` + `frame3`
  */
-import type {
-  SubmitVerificationOptions,
-  SubmitVerificationResponse,
-} from './types'
+import type { SubmitVerificationOptions, SubmitVerificationResponse } from './types'
 import { makeError } from './errors'
 
 const DEFAULT_API_URL = 'https://api.identity.kernaq.com/v1'
@@ -33,7 +32,7 @@ export async function submitVerification(
   if (opts.consentAt)        form.append('consent_at',        opts.consentAt)
   if (opts.consentType)      form.append('consent_type',      opts.consentType)
 
-  // Liveness: video OR frame sequence
+  // Liveness: video OR 3-frame sequence
   if (opts.video) {
     form.append('video', opts.video, opts.videoName ?? 'liveness.webm')
   } else if (opts.frame1 && opts.frame2 && opts.frame3) {
@@ -42,18 +41,11 @@ export async function submitVerification(
     form.append('frame_3', opts.frame3, opts.frame3Name ?? 'frame_3.jpg')
   }
 
-  // Attach capture session headers if provided
-  // These prove the payload came from a real device running the SDK.
-  // Optional until POST /v1/capture/sessions is enabled on your account.
-  const captureHeaders: Record<string, string> = {}
-  if (opts.sessionToken) captureHeaders['X-Capture-Token'] = opts.sessionToken
-  if (opts.nonce)        captureHeaders['X-Capture-Nonce'] = opts.nonce
-
   let res: Response
   try {
     res = await fetch(`${base}/verify`, {
-      method:  'POST',
-      headers: captureHeaders,
+      method: 'POST',
+      // Do NOT set Content-Type — browser sets it with boundary automatically.
       body: form,
     })
   } catch {

@@ -4,16 +4,8 @@
 
 export interface KernaqCaptureConfig {
   /**
-   * URL of YOUR backend endpoint that calls POST /v1/capture/sessions
-   * and returns the session token. The SDK never holds your API key.
-   *
-   * Your backend endpoint should return: { token: string, expires_at: string }
-   */
-  sessionEndpoint: string
-
-  /**
    * Base URL of the Kernaq Identity API.
-   * Defaults to https://api.kernaq.com/v1
+   * Defaults to https://api.identity.kernaq.com/v1
    */
   identityApiUrl?: string
 
@@ -32,18 +24,6 @@ export interface QualityConfig {
   maxBrightness?: number
   /** Reject if < this % of frame is filled (too zoomed out). Default: 0.15 */
   minFillRatio?: number
-}
-
-export interface CaptureSession {
-  /** Opaque session token — attached as X-Capture-Token on submission */
-  token: string
-  /**
-   * Single-use anti-replay nonce — attached as X-Capture-Nonce on submission.
-   * The backend verifies this matches the nonce issued with the session,
-   * preventing a captured token from being replayed by an attacker.
-   */
-  nonce: string
-  expiresAt: Date
 }
 
 export interface CaptureResult {
@@ -69,18 +49,6 @@ export type QualityFailure =
   | 'too_small'
 
 export interface SubmitVerificationOptions {
-  /**
-   * Session token from CaptureSession.token.
-   * Optional — attach to prove the payload came from the SDK.
-   * Required when your account has `require_capture_token` enabled.
-   */
-  sessionToken?: string
-  /**
-   * Anti-replay nonce from CaptureSession.nonce.
-   * Required when sessionToken is provided.
-   */
-  nonce?: string
-
   document: Blob
   documentName?: string
   selfie: Blob
@@ -92,7 +60,6 @@ export interface SubmitVerificationOptions {
   videoName?: string
   /**
    * Low-bandwidth alternative to video — 3 JPEG frames for 2G/3G devices.
-   * Supply frame1 (front-facing) + frame2 (head left) + frame3 (head right).
    * All three must be supplied together.
    */
   frame1?: Blob
@@ -114,23 +81,19 @@ export interface SubmitVerificationOptions {
 }
 
 export type DocumentType =
-  // Core identity
   | 'national_id'
   | 'passport'
   | 'driver_license'
   | 'residence_permit'
   | 'business_registration'
-  // East Africa
   | 'alien_card'
   | 'kra_pin_certificate'
   | 'sha_card'
-  | 'nhif_card'            // alias — normalised to sha_card by server
   | 'voter_id'
   | 'refugee_id'
   | 'foreign_national_id'
   | 'military_id'
   | 'student_id'
-  // AML / proof of address
   | 'utility_bill'
   | 'bank_statement'
   | 'proof_of_address'
@@ -147,14 +110,6 @@ export interface SubmitVerificationResponse {
   message: string
 }
 
-export type LivenessInstruction =
-  | 'align_face'
-  | 'hold_still'
-  | 'turn_left'
-  | 'turn_right'
-  | 'blink'
-  | 'done'
-
 export interface CaptureError extends Error {
   code: CaptureErrorCode
 }
@@ -163,7 +118,5 @@ export type CaptureErrorCode =
   | 'CAMERA_PERMISSION_DENIED'
   | 'CAMERA_NOT_FOUND'
   | 'QUALITY_CHECK_FAILED'
-  | 'SESSION_EXPIRED'
-  | 'SESSION_FETCH_FAILED'
   | 'SUBMISSION_FAILED'
   | 'BROWSER_NOT_SUPPORTED'
