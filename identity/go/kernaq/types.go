@@ -14,7 +14,7 @@ type Config struct {
 	APIKey string
 
 	// BaseURL overrides the default API base URL.
-	// Falls back to KERNAQ_API_URL env var, then https://api.kernaq.com/v1.
+	// Falls back to KERNAQ_API_URL env var, then https://api.identity.kernaq.com/v1.
 	BaseURL string
 
 	// Timeout is the HTTP request timeout. Default: 120s.

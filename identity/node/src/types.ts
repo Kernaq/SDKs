@@ -9,7 +9,7 @@ export interface KernaqConfig {
   /** API key — k_live_… for production, k_test_… for sandbox.
    *  Falls back to KERNAQ_API_KEY environment variable. */
   apiKey?: string
-  /** Override the base URL. Defaults to KERNAQ_API_URL env var or https://api.kernaq.com/v1 */
+  /** Override the base URL. Defaults to KERNAQ_API_URL env var or https://api.identity.kernaq.com/v1 */
   baseUrl?: string
   /** Request timeout in milliseconds. Default: 120_000 (2 min). */
   timeoutMs?: number

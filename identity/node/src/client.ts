@@ -4,7 +4,7 @@
  * No external HTTP dependencies.
  */
 
-export const DEFAULT_BASE_URL = process.env['KERNAQ_API_URL'] ?? 'https://api.kernaq.com/v1'
+export const DEFAULT_BASE_URL = process.env['KERNAQ_API_URL'] ?? 'https://api.identity.kernaq.com/v1'
 export const DEFAULT_TIMEOUT  = 120_000
 
 export type FileInput = Buffer | ReadableStream | Blob | ArrayBuffer
