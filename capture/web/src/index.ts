@@ -17,7 +17,7 @@
  * // 1. Initialise
  * const kernaq = new KernaqCapture({
  *   sessionEndpoint: '/api/kernaq/session', // YOUR backend route
- *   identityApiUrl:  'https://api.kernaq.com/v1',
+ *   identityApiUrl:  'https://api.identity.kernaq.com/v1',
  * })
  *
  * // 2. Get a session token (your backend calls POST /v1/capture/sessions)

@@ -13,7 +13,7 @@ import type {
 } from './types'
 import { makeError } from './errors'
 
-const DEFAULT_API_URL = 'https://api.kernaq.com/v1'
+const DEFAULT_API_URL = 'https://api.identity.kernaq.com/v1'
 
 export async function submitVerification(
   opts: SubmitVerificationOptions,
@@ -42,17 +42,18 @@ export async function submitVerification(
     form.append('frame_3', opts.frame3, opts.frame3Name ?? 'frame_3.jpg')
   }
 
+  // Attach capture session headers if provided
+  // These prove the payload came from a real device running the SDK.
+  // Optional until POST /v1/capture/sessions is enabled on your account.
+  const captureHeaders: Record<string, string> = {}
+  if (opts.sessionToken) captureHeaders['X-Capture-Token'] = opts.sessionToken
+  if (opts.nonce)        captureHeaders['X-Capture-Nonce'] = opts.nonce
+
   let res: Response
   try {
-    res = await fetch(`${base}/verifications`, {
+    res = await fetch(`${base}/verify`, {
       method:  'POST',
-      headers: {
-        // X-Capture-Token: proves the upload came from the SDK, not a script.
-        'X-Capture-Token': opts.sessionToken,
-        // X-Capture-Nonce: single-use anti-replay value paired with the token.
-        'X-Capture-Nonce': opts.nonce,
-        // Do NOT set Content-Type — browser sets it with boundary automatically.
-      },
+      headers: captureHeaders,
       body: form,
     })
   } catch {

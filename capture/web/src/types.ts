@@ -69,13 +69,17 @@ export type QualityFailure =
   | 'too_small'
 
 export interface SubmitVerificationOptions {
-  /** Session token from CaptureSession.token */
-  sessionToken: string
+  /**
+   * Session token from CaptureSession.token.
+   * Optional — attach to prove the payload came from the SDK.
+   * Required when your account has `require_capture_token` enabled.
+   */
+  sessionToken?: string
   /**
    * Anti-replay nonce from CaptureSession.nonce.
-   * Must be included — the backend rejects submissions without a matching nonce.
+   * Required when sessionToken is provided.
    */
-  nonce: string
+  nonce?: string
 
   document: Blob
   documentName?: string
