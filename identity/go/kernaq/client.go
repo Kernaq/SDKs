@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.kernaq.com/v1"
+	defaultBaseURL = "https://api.identity.kernaq.com/v1"
 	defaultTimeout = 120 * time.Second
 )
 

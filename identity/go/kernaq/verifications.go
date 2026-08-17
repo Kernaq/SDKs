@@ -118,18 +118,32 @@ func (r *VerifyResource) submit(ctx context.Context, path string, input VerifyIn
 	return &out, nil
 }
 
-// UsageResource handles GET /v1/usage.
+// UsageResource handles GET /v1/usage and GET /v1/logs.
 type UsageResource struct {
 	c *client
 }
 
-// Get returns aggregate usage for the given number of days.
+// Get returns aggregate non-PII usage statistics.
+// days: number of days to include (1–365, default 30).
 func (r *UsageResource) Get(ctx context.Context, days int) (*UsageSummary, error) {
 	if days <= 0 {
 		days = 30
 	}
 	var out UsageSummary
-	if err := r.c.get(ctx, fmt.Sprintf("/usage?days=%d", days), &out); err != nil {
+	if err := r.c.get(ctx, fmt.Sprintf("/usage?period=%dd", days), &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetLogs returns paginated raw API call logs (no PII).
+// Each entry has endpoint, status_code, duration_ms, created_at.
+func (r *UsageResource) GetLogs(ctx context.Context, limit, offset int) (*LogsResponse, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var out LogsResponse
+	if err := r.c.get(ctx, fmt.Sprintf("/logs?limit=%d&offset=%d", limit, offset), &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

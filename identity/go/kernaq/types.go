@@ -232,3 +232,21 @@ type UsageSummary struct {
 	AvgDurationMs float64      `json:"avg_duration_ms"`
 	ByDay         []DailyUsage `json:"by_day"`
 }
+
+// UsageLog is a single non-PII API call record from GET /v1/logs.
+type UsageLog struct {
+	ID         string `json:"id"`
+	PartnerID  string `json:"partner_id"`
+	Endpoint   string `json:"endpoint"`    // "/verify" | "/verify/sandbox" | "/documents/extract" etc.
+	StatusCode int    `json:"status_code"` // 200 | 422 | 400 | 500
+	DurationMs int64  `json:"duration_ms"`
+	CreatedAt  string `json:"created_at"`  // RFC3339
+}
+
+// LogsResponse is returned by GET /v1/logs.
+type LogsResponse struct {
+	Logs   []UsageLog `json:"logs"`
+	Total  int        `json:"total"`
+	Limit  int        `json:"limit"`
+	Offset int        `json:"offset"`
+}
