@@ -148,3 +148,48 @@ func (r *UsageResource) GetLogs(ctx context.Context, limit, offset int) (*LogsRe
 	}
 	return &out, nil
 }
+
+// ── AuditResource — /v1/audit/* ──────────────────────────────────────────────
+
+// AuditResource handles audit receipt endpoints.
+type AuditResource struct {
+	c *client
+}
+
+// ListReceipts returns paginated audit receipts for this partner.
+func (r *AuditResource) ListReceipts(ctx context.Context, limit, offset int) (*AuditReceiptsResponse, error) {
+	if limit <= 0 { limit = 50 }
+	var out AuditReceiptsResponse
+	if err := r.c.get(ctx, fmt.Sprintf("/audit/receipts?limit=%d&offset=%d", limit, offset), &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetReceipt returns a single audit receipt by ID.
+func (r *AuditResource) GetReceipt(ctx context.Context, id string) (*AuditReceipt, error) {
+	var out AuditReceipt
+	if err := r.c.get(ctx, "/audit/receipts/"+id, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// VerifyReceipt validates a JWT receipt token issued by Kernaq.
+func (r *AuditResource) VerifyReceipt(ctx context.Context, token string) (*VerifyReceiptResponse, error) {
+	var out VerifyReceiptResponse
+	body := map[string]string{"token": token}
+	if err := r.c.post(ctx, "/audit/verify-receipt", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetPublicKey returns the RSA public key for offline receipt verification.
+func (r *AuditResource) GetPublicKey(ctx context.Context) (*PublicKeyResponse, error) {
+	var out PublicKeyResponse
+	if err := r.c.get(ctx, "/audit/public-key", &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

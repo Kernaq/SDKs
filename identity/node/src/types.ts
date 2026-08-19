@@ -237,3 +237,69 @@ export interface UsageSummary {
   days:        number
   daily:       DailyUsage[]
 }
+
+// ── Audit receipts ────────────────────────────────────────────────────────────
+
+/**
+ * AuditReceipt is a tamper-proof compliance record returned with every
+ * verification. It contains ZERO PII — no names, IDs, or photos.
+ *
+ * Store the `auditJwt` permanently in your own database. Kernaq deletes
+ * its row after 90 days, but the JWT remains self-verifying forever via
+ * the RSA public key at GET /v1/audit/public-key.
+ */
+export interface AuditReceipt {
+  /** Unique ID for this verification */
+  id:            string
+  /** Your project UUID */
+  partnerId:     string
+  /**
+   * HMAC-SHA256 of (id_number + ":" + date_of_birth), keyed by your partner secret.
+   * Irreversible. You can regenerate it to check "was my user verified?"
+   * without storing any PII.
+   */
+  identityHash:  string
+  /** "pass" | "fail" | "review" */
+  verdict:       string
+  /** 0–100 risk score (higher = more risk) */
+  confidence:    number
+  /** Which checks ran: ["document", "face", "liveness"] */
+  checksRun:     string[]
+  documentType:  string
+  country:       string
+  failureReason?: string
+  createdAt:     string
+  expiresAt:     string  // 90 days from createdAt — row is deleted, JWT still valid
+}
+
+/**
+ * AuditJwtPayload is the decoded payload of a Kernaq audit receipt JWT.
+ * Verify it offline using the RSA public key from GET /v1/audit/public-key.
+ */
+export interface AuditJwtPayload {
+  iss:            string   // "kernaq.com"
+  jti:            string   // verification_id
+  iat:            number   // issued at (unix timestamp)
+  partner_id:     string
+  identity_hash:  string
+  verdict:        string
+  confidence:     number
+  checks_run:     string[]
+  document_type:  string
+  country:        string
+  failure_reason?: string
+}
+
+export interface VerifyReceiptResponse {
+  valid:    boolean
+  message:  string
+  payload?: AuditJwtPayload
+}
+
+export interface PublicKeyResponse {
+  algorithm:  string    // "RS256"
+  public_key: string    // PEM-encoded RSA-2048 public key
+  usage:      string
+  issuer:     string
+  key_format: string    // "PEM"
+}

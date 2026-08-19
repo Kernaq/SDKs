@@ -250,3 +250,46 @@ type LogsResponse struct {
 	Limit  int        `json:"limit"`
 	Offset int        `json:"offset"`
 }
+
+// ── Audit receipts ────────────────────────────────────────────────────────────
+
+// AuditReceipt is a tamper-proof compliance record.
+// Contains ZERO PII. Store AuditJWT permanently — Kernaq deletes the row after 90 days.
+type AuditReceipt struct {
+	ID            string   `json:"id"`
+	PartnerID     string   `json:"partner_id"`
+	IdentityHash  string   `json:"identity_hash"`   // HMAC-SHA256(id+dob, secret) — irreversible
+	Verdict       string   `json:"verdict"`
+	Confidence    int      `json:"confidence"`
+	ChecksRun     []string `json:"checks_run"`
+	DocumentType  string   `json:"document_type"`
+	Country       string   `json:"country"`
+	FailureReason string   `json:"failure_reason,omitempty"`
+	AuditJWT      string   `json:"audit_jwt"`       // RS256-signed receipt — store permanently
+	CreatedAt     string   `json:"created_at"`
+	ExpiresAt     string   `json:"expires_at"`      // 90 days — row purged, JWT still valid
+}
+
+// AuditReceiptsResponse is returned by GET /v1/audit/receipts.
+type AuditReceiptsResponse struct {
+	Receipts []AuditReceipt `json:"receipts"`
+	Total    int            `json:"total"`
+	Limit    int            `json:"limit"`
+	Offset   int            `json:"offset"`
+}
+
+// VerifyReceiptResponse is returned by POST /v1/audit/verify-receipt.
+type VerifyReceiptResponse struct {
+	Valid   bool        `json:"valid"`
+	Message string      `json:"message"`
+	Payload interface{} `json:"payload,omitempty"`
+}
+
+// PublicKeyResponse is returned by GET /v1/audit/public-key.
+type PublicKeyResponse struct {
+	Algorithm string `json:"algorithm"`   // "RS256"
+	PublicKey string `json:"public_key"`  // PEM-encoded RSA-2048
+	Usage     string `json:"usage"`
+	Issuer    string `json:"issuer"`
+	KeyFormat string `json:"key_format"`  // "PEM"
+}
