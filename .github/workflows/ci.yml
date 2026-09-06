@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Node.js — build + type check ─────────────────────────────────────────
+  build-node:
+    name: Build Node SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: identity/node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm run build
+
+  # ── Go — compile check ────────────────────────────────────────────────────
+  build-go:
+    name: Build Go SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: identity/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - run: go build ./...
+      - run: go vet ./...
+
+  # ── Java — compile check ──────────────────────────────────────────────────
+  build-java:
+    name: Build Java SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: identity/java
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+      - run: mvn --batch-mode compile -q
