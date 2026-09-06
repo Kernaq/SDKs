@@ -179,7 +179,7 @@ func (r *AuditResource) GetReceipt(ctx context.Context, id string) (*AuditReceip
 func (r *AuditResource) VerifyReceipt(ctx context.Context, token string) (*VerifyReceiptResponse, error) {
 	var out VerifyReceiptResponse
 	body := map[string]string{"token": token}
-	if err := r.c.post(ctx, "/audit/verify-receipt", body, &out); err != nil {
+	if err := r.c.postJSON(ctx, "/audit/verify-receipt", body, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
