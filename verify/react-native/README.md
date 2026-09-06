@@ -27,6 +27,25 @@ Add to `android/app/src/main/AndroidManifest.xml`:
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
+### Android — vision-camera setup
+
+Add to `android/app/build.gradle`:
+```gradle
+android {
+  ...
+  defaultConfig {
+    ...
+    minSdkVersion 26
+  }
+}
+```
+
+### iOS — link native modules
+
+```bash
+cd ios && pod install
+```
+
 ### iOS permissions
 
 Add to `ios/<App>/Info.plist`:
