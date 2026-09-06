@@ -7,7 +7,7 @@
   "files": ["dist", "README.md"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kernaq/SDKs.git",
+    "url": "git+https://github.com/Kernaq/SDKs.git",
     "directory": "identity/node"
   },
   "publishConfig": {
