@@ -1,0 +1,53 @@
+{
+  "name": "@kernaq/verify-react-native",
+  "version": "1.0.0",
+  "description": "Drop-in KYC verification UI for React Native — document capture, selfie, and liveness in one component.",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__"
+  ],
+  "scripts": {
+    "build": "bob build",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["react-native", "kyc", "identity", "verification", "liveness", "kernaq"],
+  "author": "Kernaq",
+  "license": "SEE LICENSE IN LICENSE",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.73.0",
+    "react-native-vision-camera": ">=4.0.0",
+    "react-native-permissions": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "react-native-builder-bob": "^0.30.0",
+    "typescript": "^7.0.2"
+  },
+  "codegenConfig": {
+    "name": "KernaqVerifySpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      ["commonjs", { "esm": true }],
+      ["module", { "esm": true }],
+      "typescript"
+    ]
+  }
+}

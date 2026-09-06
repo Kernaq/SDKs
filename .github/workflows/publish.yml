@@ -23,6 +23,7 @@ on:
           - java
           - python
           - verify
+          - verify-react-native
           - go
 
 permissions:
@@ -163,6 +164,47 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: twine upload dist/*
 
+  # ── @kernaq/verify-react-native → npmjs.com ──────────────────────────────
+  publish-verify-rn:
+    runs-on: ubuntu-latest
+    if: >
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event.inputs.sdk == 'all' ||
+      github.event.inputs.sdk == 'verify-react-native'
+    defaults:
+      run:
+        working-directory: verify/react-native
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          npm version $VERSION --no-git-tag-version
+
+      - name: Set version from input
+        if: github.event_name == 'workflow_dispatch'
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   # ── @kernaq/verify → npmjs.com ───────────────────────────────────────────
   publish-verify:
     runs-on: ubuntu-latest
@@ -180,7 +222,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install deps
