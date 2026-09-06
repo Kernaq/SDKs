@@ -5,6 +5,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist", "README.md"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kernaq/SDKs.git",
+    "directory": "identity/node"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "lint":  "tsc --noEmit"

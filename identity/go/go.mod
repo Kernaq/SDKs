@@ -1,3 +1,3 @@
-module github.com/Kernaq-Ltd/kernaq-go
+module github.com/Kernaq/SDKs/identity/go
 
 go 1.22

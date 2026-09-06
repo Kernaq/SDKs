@@ -43,6 +43,14 @@
     </dependency>
   </dependencies>
 
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Kernaq Apache Maven Packages</name>
+      <url>https://maven.pkg.github.com/Kernaq/SDKs</url>
+    </repository>
+  </distributionManagement>
+
   <build>
     <plugins>
       <plugin>

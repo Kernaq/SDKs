@@ -1,0 +1,13 @@
+# Kernaq SDK maintainers
+# These people must review and approve all changes before merge.
+# GitHub enforces this automatically when branch protection is enabled.
+
+# Everything requires review from the Kernaq team
+*                   @Kernaq/maintainers
+
+# SDK-specific ownership
+identity/node/      @Kernaq/maintainers
+identity/go/        @Kernaq/maintainers
+identity/java/      @Kernaq/maintainers
+identity/python/    @Kernaq/maintainers
+capture/            @Kernaq/maintainers
