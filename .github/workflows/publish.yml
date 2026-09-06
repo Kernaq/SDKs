@@ -19,7 +19,7 @@ permissions:
 
 jobs:
 
-  # ── Node.js → GitHub Packages npm ──────────────────────────────────────────
+  # ── Node.js → npmjs.com ───────────────────────────────────────────────────
   publish-node:
     runs-on: ubuntu-latest
     defaults:
@@ -33,8 +33,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@kernaq"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install deps
         run: npm ci
@@ -52,10 +51,10 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
 
-      - name: Publish to GitHub Packages
-        run: npm publish
+      - name: Publish to npm
+        run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ── Java → GitHub Packages Maven ───────────────────────────────────────────
   publish-java:
