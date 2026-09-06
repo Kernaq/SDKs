@@ -6,12 +6,22 @@ on:
     tags:
       - "v*.*.*"
 
-  # Also allow manual publish from GitHub Actions UI
+  # Allow manual publish from GitHub Actions UI
   workflow_dispatch:
     inputs:
       version:
         description: "Version to publish (e.g. 1.0.0)"
         required: true
+      sdk:
+        description: "Which SDK to publish: node | java | go | all"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - node
+          - java
+          - go
 
 permissions:
   contents: read
@@ -22,6 +32,10 @@ jobs:
   # ── Node.js → npmjs.com ───────────────────────────────────────────────────
   publish-node:
     runs-on: ubuntu-latest
+    if: >
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event.inputs.sdk == 'all' ||
+      github.event.inputs.sdk == 'node'
     defaults:
       run:
         working-directory: identity/node
@@ -59,6 +73,10 @@ jobs:
   # ── Java → GitHub Packages Maven ───────────────────────────────────────────
   publish-java:
     runs-on: ubuntu-latest
+    if: >
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event.inputs.sdk == 'all' ||
+      github.event.inputs.sdk == 'java'
     defaults:
       run:
         working-directory: identity/java
@@ -103,11 +121,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── Go — no publish step needed ────────────────────────────────────────────
-  # Go modules are distributed directly from the public repo.
-  # Just tag and the module is available via:
-  #   go get github.com/Kernaq/SDKs/identity/go@v1.0.0
   tag-go:
     runs-on: ubuntu-latest
+    if: >
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event.inputs.sdk == 'all' ||
+      github.event.inputs.sdk == 'go'
     steps:
       - uses: actions/checkout@v4
       - name: Verify go.mod
