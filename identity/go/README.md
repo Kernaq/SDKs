@@ -11,7 +11,7 @@ Document OCR · Face matching · Liveness detection · Full KYC pipeline
 ## Installation
 
 ```bash
-go get github.com/Kernaq/kernaq-go
+go get github.com/Kernaq/sdk-go
 ```
 
 ---
@@ -27,7 +27,7 @@ import (
     "log"
     "os"
 
-    "github.com/Kernaq/kernaq-go/kernaq"
+    "github.com/Kernaq/sdk-go/kernaq"
 )
 
 func main() {
@@ -347,7 +347,7 @@ import (
     "encoding/json"
     "net/http"
 
-    "github.com/Kernaq/kernaq-go/kernaq"
+    "github.com/Kernaq/sdk-go/kernaq"
 )
 
 var k = kernaq.New(kernaq.Config{})
