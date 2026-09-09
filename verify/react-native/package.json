@@ -1,6 +1,6 @@
 {
   "name": "@kernaq/verify-react-native",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Drop-in KYC verification UI for React Native — document capture, selfie, and liveness in one component.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

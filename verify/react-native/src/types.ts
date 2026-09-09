@@ -1,14 +1,21 @@
 /**
- * @kernaq/verify-react-native — public types
+ * @kernaq/verify-react-native — public types (v2)
  */
 
 export type VerifyStep =
   | 'intro'
-  | 'document'
+  | 'doc-front'
+  | 'doc-back'
   | 'selfie'
   | 'liveness'
   | 'processing'
   | 'result'
+
+/** Which capture steps to include. Default: all three. */
+export type VerifyStepName = 'document' | 'selfie' | 'liveness'
+
+/** Liveness challenge tasks */
+export type LivenessTask = 'blink' | 'turn-left' | 'turn-right' | 'nod' | 'open-mouth'
 
 export type DocumentType =
   | 'national_id'
@@ -29,21 +36,14 @@ export interface VerifyResult {
 }
 
 export interface VerifyTheme {
-  /** Primary accent colour. Default: #111827 */
   accentColor?: string
-  /** Modal background. Default: #ffffff */
   backgroundColor?: string
-  /** Primary text colour. Default: #111827 */
   textColor?: string
-  /** Subtle text colour. Default: #6b7280 */
   subtextColor?: string
-  /** Border/divider colour. Default: #e5e7eb */
   borderColor?: string
-  /** Card/surface colour. Default: #f9fafb */
   cardColor?: string
-  /** Border radius for buttons and cards. Default: 12 */
   borderRadius?: number
-  /** 'light' | 'dark' — overrides bg/text when set */
+  /** 'light' | 'dark' */
   mode?: 'light' | 'dark'
 }
 
@@ -51,74 +51,50 @@ export interface VerifyLocale {
   intro_title: string
   intro_body: string
   intro_cta: string
-  doc_title: string
-  doc_instruction: string
+  doc_front_title: string
+  doc_front_instruction: string
+  doc_back_title: string
+  doc_back_instruction: string
   doc_capture_btn: string
   doc_retake_btn: string
-  doc_next_btn: string
   selfie_title: string
   selfie_instruction: string
-  selfie_capture_btn: string
-  selfie_retake_btn: string
-  selfie_next_btn: string
   liveness_title: string
-  liveness_instruction: string
-  liveness_start_btn: string
-  liveness_recording: string
+  liveness_ready: string
+  liveness_task_prefix: string
+  liveness_complete: string
   processing_title: string
-  processing_subtitle: string
   result_pass_title: string
   result_pass_body: string
   result_fail_title: string
   result_fail_body: string
   result_review_title: string
   result_review_body: string
-  result_retry_btn: string
   error_camera_denied: string
+  error_blur: string
   error_quality: string
   error_network: string
 }
 
 export interface VerifyConfig {
-  /**
-   * Your Kernaq publishable API key (k_test_... or k_live_...).
-   * For production use a backend proxy and pass backendUrl instead.
-   */
   apiKey?: string
-
-  /**
-   * URL of your backend proxy that forwards to the Kernaq Identity API.
-   * POST /verify with multipart/form-data.
-   */
   backendUrl?: string
-
-  /** Document types the user can select. Default: ['national_id', 'passport'] */
-  documentTypes?: DocumentType[]
-
-  /** Country code (ISO 3166-1 alpha-3). Default: 'KEN' */
+  /** Single document type the developer specifies. Default: 'national_id' */
+  documentType?: DocumentType
   country?: string
-
-  /** Your internal reference ID for this user/session */
   reference?: string
-
-  /** Use sandbox mode — no billing, test responses */
   sandbox?: boolean
-
-  /** Liveness recording duration in ms. Default: 3000 */
   livenessDuration?: number
-
-  /** Theming */
+  /** Number of liveness tasks. Default: 2 */
+  livenessTaskCount?: number
+  /**
+   * Which steps to include. Default: all three.
+   * @example steps={['selfie', 'liveness']}
+   */
+  steps?: VerifyStepName[]
   theme?: VerifyTheme
-
-  /** Override any displayed string */
   locale?: Partial<VerifyLocale>
-
-  /** Called when the user dismisses without completing */
   onCancel?: () => void
-
-  /** Called when verification is complete */
   onComplete?: (result: VerifyResult) => void
-
-  /** Called on unrecoverable error */
   onError?: (error: { code: string; message: string }) => void
 }

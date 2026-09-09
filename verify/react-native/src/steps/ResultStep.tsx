@@ -1,26 +1,34 @@
+/**
+ * ResultStep — no emoji, Unicode geometric icons, detail rows matching web v2.
+ */
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import type { ResolvedTheme } from '../theme'
 import type { VerifyLocale, VerifyResult, VerifyVerdict } from '../types'
 
 interface Props {
-  theme: ResolvedTheme
-  locale: VerifyLocale
-  result: VerifyResult | null
-  error: string | null
+  theme:   ResolvedTheme
+  locale:  VerifyLocale
+  result:  VerifyResult | null
+  error:   string | null
   onRetry: () => void
 }
 
-const ICONS: Record<VerifyVerdict, string> = {
-  pass:   '✅',
-  fail:   '❌',
-  review: '⏳',
+// Unicode block characters — no emoji, render cleanly on all platforms
+const ICON: Record<VerifyVerdict, string> = {
+  pass:   '\u2714',   // ✔ heavy check mark
+  fail:   '\u2718',   // ✘ heavy ballot X
+  review: '\u29D6',   // ⧖ hourglass
 }
-
 const ICON_BG: Record<VerifyVerdict, string> = {
-  pass:   '#d1fae5',
+  pass:   '#dcfce7',
   fail:   '#fee2e2',
-  review: '#fef3c7',
+  review: '#fef9c3',
+}
+const ICON_COLOR: Record<VerifyVerdict, string> = {
+  pass:   '#16a34a',
+  fail:   '#dc2626',
+  review: '#ca8a04',
 }
 
 export function ResultStep({ theme, locale, result, error, onRetry }: Props) {
@@ -29,18 +37,19 @@ export function ResultStep({ theme, locale, result, error, onRetry }: Props) {
   if (!result) {
     return (
       <View style={s.container}>
-        <View style={[s.iconWrap, { backgroundColor: '#fee2e2' }]}>
-          <Text style={s.icon}>❌</Text>
+        <View style={[s.iconBox, { backgroundColor: ICON_BG.fail }]}>
+          <Text style={[s.icon, { color: ICON_COLOR.fail }]}>{ICON.fail}</Text>
         </View>
         <Text style={s.title}>{locale.result_fail_title}</Text>
         <Text style={s.body}>{error ?? locale.result_fail_body}</Text>
         <TouchableOpacity style={s.btn} onPress={onRetry} activeOpacity={0.85}>
-          <Text style={s.btnText}>{locale.result_retry_btn}</Text>
+          <Text style={s.btnText}>Try again</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
+  const v = result.verdict
   const titles: Record<VerifyVerdict, string> = {
     pass:   locale.result_pass_title,
     fail:   locale.result_fail_title,
@@ -52,16 +61,37 @@ export function ResultStep({ theme, locale, result, error, onRetry }: Props) {
     review: locale.result_review_body,
   }
 
+  const rows: Array<{ label: string; value: string; ok?: boolean; bad?: boolean }> = [
+    { label: 'Verdict',    value: v.charAt(0).toUpperCase() + v.slice(1), ok: v === 'pass', bad: v === 'fail' },
+    { label: 'Risk score', value: String(result.score ?? '—') },
+    { label: 'Face match', value: result.faceMatch ? 'Confirmed' : 'Not confirmed', ok: result.faceMatch, bad: !result.faceMatch },
+    { label: 'Liveness',   value: result.isLive    ? 'Confirmed' : 'Not confirmed', ok: result.isLive,    bad: !result.isLive },
+  ]
+
   return (
     <View style={s.container}>
-      <View style={[s.iconWrap, { backgroundColor: ICON_BG[result.verdict] }]}>
-        <Text style={s.icon}>{ICONS[result.verdict]}</Text>
+      <View style={[s.iconBox, { backgroundColor: ICON_BG[v] }]}>
+        <Text style={[s.icon, { color: ICON_COLOR[v] }]}>{ICON[v]}</Text>
       </View>
-      <Text style={s.title}>{titles[result.verdict]}</Text>
-      <Text style={s.body}>{bodies[result.verdict]}</Text>
-      {result.verdict === 'fail' && (
+      <Text style={s.title}>{titles[v]}</Text>
+      <Text style={s.body}>{bodies[v]}</Text>
+
+      <View style={s.details}>
+        {rows.map((row) => (
+          <View key={row.label} style={s.row}>
+            <Text style={s.rowLabel}>{row.label}</Text>
+            <Text style={[
+              s.rowVal,
+              row.ok  && s.rowOk,
+              row.bad && s.rowBad,
+            ]}>{row.value}</Text>
+          </View>
+        ))}
+      </View>
+
+      {v === 'fail' && (
         <TouchableOpacity style={s.btn} onPress={onRetry} activeOpacity={0.85}>
-          <Text style={s.btnText}>{locale.result_retry_btn}</Text>
+          <Text style={s.btnText}>Try again</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -71,38 +101,72 @@ export function ResultStep({ theme, locale, result, error, onRetry }: Props) {
 const styles = (t: ResolvedTheme) =>
   StyleSheet.create({
     container: {
-      padding: 40,
+      flex: 1,
+      padding: 28,
       alignItems: 'center',
-      gap: 12,
+      gap: 14,
+      justifyContent: 'center',
     },
-    iconWrap: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
+    iconBox: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 8,
+      marginBottom: 4,
     },
-    icon: { fontSize: 34 },
+    icon: {
+      fontSize: 22,
+      fontWeight: '700',
+    },
     title: {
       fontSize: 20,
       fontWeight: '700',
       color: t.text,
       textAlign: 'center',
+      letterSpacing: -0.3,
     },
     body: {
-      fontSize: 14,
+      fontSize: 13.5,
       color: t.subtext,
       textAlign: 'center',
-      lineHeight: 21,
+      lineHeight: 19,
     },
-    btn: {
-      marginTop: 8,
-      backgroundColor: t.accent,
-      borderRadius: t.radius,
-      paddingVertical: 14,
-      paddingHorizontal: 32,
+    details: {
+      width: '100%',
+      gap: 6,
+    },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      backgroundColor: t.surface,
+      borderRadius: 8,
     },
-    btnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+    rowLabel: {
+      fontSize: 12.5,
+      color: t.subtext,
+    },
+    rowVal: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: t.text,
+    },
+    rowOk:  { color: '#16a34a' },
+    rowBad: { color: '#dc2626' },
+    btn: {
+      width: '100%',
+      backgroundColor: t.accent,
+      borderRadius: t.radius - 4,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    btnText: {
+      color: t.accentInv,
+      fontSize: 14,
+      fontWeight: '600',
+    },
   })

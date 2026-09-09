@@ -13,26 +13,22 @@ export function IntroStep({ theme, locale, onStart }: Props) {
   const s = styles(theme)
   return (
     <View style={s.container}>
-      <View style={s.steps}>
-        {[
-          { icon: '🪪', label: 'Document' },
-          { icon: '🤳', label: 'Selfie' },
-          { icon: '👁️', label: 'Liveness' },
-        ].map((item) => (
-          <View key={item.label} style={s.step}>
-            <View style={s.stepIcon}>
-              <Text style={s.stepEmoji}>{item.icon}</Text>
-            </View>
-            <Text style={s.stepLabel}>{item.label}</Text>
-          </View>
-        ))}
+      <View style={s.textBlock}>
+        <Text style={s.title}>{locale.intro_title}</Text>
+        <Text style={s.subtitle}>{locale.intro_body}</Text>
       </View>
 
-      <Text style={s.title}>{locale.intro_title}</Text>
-      <Text style={s.body}>{locale.intro_body}</Text>
+      {/* Privacy hint */}
+      <View style={s.hint}>
+        <Text style={s.hintIcon}>&#x1F512;</Text>
+        <Text style={s.hintText}>
+          Your data is discarded immediately after processing. Nothing is stored.
+        </Text>
+      </View>
 
       <TouchableOpacity style={s.btn} onPress={onStart} activeOpacity={0.85}>
         <Text style={s.btnText}>{locale.intro_cta}</Text>
+        <Text style={s.btnArrow}> →</Text>
       </TouchableOpacity>
     </View>
   )
@@ -40,43 +36,68 @@ export function IntroStep({ theme, locale, onStart }: Props) {
 
 const styles = (t: ResolvedTheme) =>
   StyleSheet.create({
-    container: { padding: 24 },
-    steps: {
-      flexDirection: 'row',
+    container: {
+      flex: 1,
+      padding: 28,
       justifyContent: 'center',
-      gap: 20,
-      marginBottom: 28,
+      gap: 16,
     },
-    step: { alignItems: 'center', gap: 8 },
-    stepIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 14,
-      backgroundColor: t.card,
-      borderWidth: 1,
-      borderColor: t.border,
+    textBlock: {
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 4,
     },
-    stepEmoji: { fontSize: 24 },
-    stepLabel: { fontSize: 12, color: t.subtext },
     title: {
       fontSize: 22,
       fontWeight: '700',
       color: t.text,
-      marginBottom: 10,
+      textAlign: 'center',
+      letterSpacing: -0.4,
     },
-    body: {
+    subtitle: {
       fontSize: 14,
       color: t.subtext,
       lineHeight: 21,
-      marginBottom: 28,
+      textAlign: 'center',
+    },
+    hint: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      padding: 12,
+      backgroundColor: t.surface,
+      borderRadius: t.radius - 4,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    hintIcon: {
+      fontSize: 12,
+      marginTop: 1,
+    },
+    hintText: {
+      flex: 1,
+      fontSize: 12,
+      color: t.subtext,
+      lineHeight: 17,
     },
     btn: {
       backgroundColor: t.accent,
-      borderRadius: t.radius,
-      paddingVertical: 14,
+      borderRadius: t.radius - 4,
+      paddingVertical: 13,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
     },
-    btnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+    btnText: {
+      color: t.accentInv,
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+    },
+    btnArrow: {
+      color: t.accentInv,
+      fontSize: 14,
+      fontWeight: '600',
+    },
   })
