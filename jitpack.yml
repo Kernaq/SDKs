@@ -3,4 +3,4 @@ jdk:
 before_install:
   - sdk install java 17.0.10-open || true
 install:
-  - cd identity/java && mvn install -DskipTests
+  - mvn install -DskipTests
